@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
+		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.16.0" />
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+		<PackageReference Include="zxcvbn-core" Version="7.0.92" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Bravo.UnitTests" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\Domain\Bravo.Domain\Bravo.Domain.csproj" />
+	  <ProjectReference Include="..\..\Domain\Bravo.Shared\Bravo.Shared.csproj" />
+	</ItemGroup>
+
+</Project>

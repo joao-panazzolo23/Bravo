@@ -1,0 +1,4 @@
+﻿amespace Bravo.Shared.Entities
+{
+
+}

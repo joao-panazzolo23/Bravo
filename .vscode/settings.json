@@ -1,0 +1,26 @@
+{
+    // Auto-format supported files on save
+    "editor.formatOnSave": true,
+    // Prefer opening the solution when the workspace loads
+    "dotnet.defaultSolution": "Icone.sln",
+    // C#-specific formatting behavior
+    "[csharp]": {
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true,
+        "editor.defaultFormatter": "ms-dotnettools.csdevkit"
+    },
+    // Organize using directives when formatting
+    "dotnet.formatting.organizeImports": true,
+    // Hide build artifacts in Explorer and search
+    "files.exclude": {
+        "**/bin": true,
+        "**/obj": true
+    },
+    "search.exclude": {
+        "**/bin": true,
+        "**/obj": true
+    },
+    // Keep line endings and whitespace consistent across editors
+    "files.insertFinalNewline": true,
+    "files.trimTrailingWhitespace": true
+}

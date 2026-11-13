@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.16.0" />
+		<PackageReference Include="Scalar.AspNetCore" Version="2.13.11" />
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Application\Bravo.Application\Bravo.Application.csproj" />
+		<ProjectReference Include="..\..\Domain\Bravo.Domain\Bravo.Domain.csproj" />
+		<ProjectReference Include="..\..\Domain\Bravo.Shared\Bravo.Shared.csproj" />
+		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Auth\Bravo.Infrastructure.Auth.csproj" />
+		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Email\Bravo.Infrastructure.Email.csproj" />
+		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.PostgreSQL.Dapper\Bravo.Infrastructure.PostgreSQL.Dapper.csproj" />
+		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.PostgreSQL\Bravo.Infrastructure.PostgreSQL.csproj" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+</Project>
