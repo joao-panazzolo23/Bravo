@@ -1,220 +1,147 @@
-﻿# 🏛️ Nomad DDD Template
+﻿# 🇧🇷 BRAVO — Brazilian Voting
 
-> **Enterprise-Grade API Template** • Domain-Driven Design • Built with .NET
+**Exploring Brazilian elections through data.**
 
-<div align="center">
+BRAVO (Brazilian Voting) is an open-source data analysis project built with **.NET**, focused on collecting, processing, organizing, and analyzing Brazilian electoral data.
 
-[![.NET](https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
-[![EF Core](https://img.shields.io/badge/EF%20Core-7.0-512BD4?style=for-the-badge&logo=dotnet)](https://learn.microsoft.com/ef/core/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Ready-336791?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](https://www.docker.com/)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-27AE60?style=for-the-badge)](/)
+Its main purpose is to transform raw electoral datasets into meaningful statistical insights, helping identify voting patterns, electoral trends, historical changes, and regional differences across Brazil.
 
-</div>
+Rather than simply presenting election results, BRAVO aims to explore the data behind them, uncover relationships, investigate statistical patterns, and provide a broader understanding of the Brazilian electoral landscape.
 
 ---
 
-## ✨ About Core Template
+## 🎯 Project Goals
 
-A **custom, opinionated API template** for building scalable, maintainable systems using **Domain-Driven Design (DDD)** principles. Built with .NET CLI tooling and designed for enterprise applications that demand clean architecture.
+BRAVO aims to provide tools and analytical capabilities for:
 
-Perfect for teams that want to move fast without sacrificing structure.
+- **Electoral Analysis:** Explore results from municipal, state, and federal elections.
+- **Statistical Analysis:** Identify voting patterns, distributions, correlations, and trends.
+- **Historical Comparison:** Track changes in candidates' and political parties' performance across different elections.
+- **Geographical Analysis:** Investigate electoral differences between municipalities, states, and regions.
+- **Data Correlation:** Explore potential relationships between demographic, socioeconomic, and electoral indicators.
+- **Data Visualization:** Transform raw information into meaningful indicators, charts, and reports.
 
----
+## ⚙️ How It Works
 
-## 🚀 Quick Start
+BRAVO follows a data processing pipeline, transforming raw electoral datasets into structured information suitable for statistical analysis.
 
-### 1️⃣ Clone the Repository
+### 1. Data Collection
 
-```bash
-git clone https://github.com/wearenomad/ddd-core-template
-cd ddd-core-template
-```
+The first step consists of retrieving electoral datasets from public and official sources.
 
-### 2️⃣ Install as a .NET Template
+The primary data provider will be the **Superior Electoral Court (TSE)**, which publishes historical and current datasets about Brazilian elections.
 
-Navigate to the parent directory, then run:
+The project may work with datasets containing:
 
-```bash
-# From one level above the template folder
-dotnet new install ./ddd-core-template
-```
+- Election results by candidate and political party.
+- Vote counts by municipality and electoral zone.
+- Voter turnout, blank votes, and invalid votes.
+- Voter demographic information.
+- Candidate and political party records.
+- Historical election data.
 
-**Or specify the full path:**
-```bash
-dotnet new install /path/to/ddd-core-template
-```
+**Primary data source:** [TSE Open Data Portal](https://dadosabertos.tse.jus.br/).
 
-> 💡 **Tip:** All configuration is handled in `.template.config/template.json` — no manual setup needed.
+### 2. Data Processing and Normalization
 
-### 3️⃣ Create Your First Project
+Raw datasets will be imported, processed, validated, and normalized before being made available for analysis.
 
-```bash
-dotnet new nomad-ddd -n "MyAwesomeProject"
-```
+This stage will be responsible for:
 
-Your project will be created in the current directory with the structure ready to go.
+- Reading and parsing source files.
+- Standardizing formats and naming conventions.
+- Handling missing or inconsistent values.
+- Detecting and handling duplicate records.
+- Establishing relationships between different datasets.
+- Structuring information for efficient querying and analysis.
 
-### 4️⃣ Customize Your Settings
+The goal is to build a consistent and reliable dataset that allows different sources of information to be analyzed together.
 
-Update the generated project's configuration files:
-- `appsettings.json` — Application settings & database connections
-- `launchSettings.json` — Launch profiles & environment config
+### 3. Statistical Analysis
 
----
+Once the data has been structured, BRAVO will perform statistical analyses to extract meaningful information from electoral results.
 
-## 📦 Removing or Updating the Template
+Planned analytical capabilities include:
 
-**Uninstall if needed:**
-```bash
-# By name (will show the actual path if this doesn't work)
-dotnet new uninstall nomad-ddd
+**Electoral Performance**
 
-# Or by path
-dotnet new uninstall /path/to/ddd-core-template
-```
+- Historical voting performance of candidates and political parties.
+- Vote distribution and percentage analysis.
+- Comparison between consecutive elections.
+- Identification of regions with higher voting concentrations.
 
----
+**Voting Behavior**
 
-## 🐳 Docker Support
+- Changes in voter turnout.
+- Distribution of valid, blank, and invalid votes.
+- Regional differences in voting patterns.
+- Identification of geographical voting patterns.
 
-### Pull Latest Images
+**Historical Analysis**
 
-```bash
-docker pull mcr.microsoft.com/dotnet/sdk:10.0
-docker pull mcr.microsoft.com/dotnet/aspnet:10.0
-```
+- Growth and decline of political parties.
+- Changes in vote distribution over time.
+- Comparison between different electoral cycles.
 
-### Build Your Docker Image
+**Correlation Analysis**
 
-```bash
-docker build -t core-template:1.0 .
-```
+- Relationships between socioeconomic indicators and electoral results.
+- Investigation of correlations between demographic characteristics and voting patterns.
+- Identification of statistically similar electoral behaviors across different regions.
 
-### Run Your Container
+All analyses will follow a statistical and exploratory approach. Correlation will not be interpreted as proof of causation.
 
-```bash
-docker run -p 8080:80 core-template:1.0
-```
+### 4. Results and Visualization
 
-Visit `http://localhost:8080` to see your app in action! 🌐
+Analytical results will be organized to make exploration, interpretation, and comparison easier.
 
-**Need another instance?** Just change the port:
-```bash
-docker run -p 9000:80 core-template:1.0
-```
-
-### Useful Docker Commands
-
-| Command | Purpose |
-|---------|---------|
-| `docker ps` | List running containers |
-| `docker logs <container_id>` | View container logs |
-| `docker stop <container_id>` | Stop a running container |
-| `docker rmi core-template:1.0` | Remove the image |
+The project intends to provide structured access to information through statistical indicators, tables, historical comparisons, charts, and other visualization tools.
 
 ---
 
-## 🗄️ Database Migrations
+## 🏗️ Technology Stack
 
-Manage your Entity Framework Core migrations with ease:
+BRAVO will be developed using the .NET ecosystem.
 
-### Step 1️⃣ Navigate to Infrastructure
-```bash
-cd src/Infrastructure/Bravo.Infrastructure.PostgreSQL/
-```
+| Technology | Purpose                                     |
+| ---------- | ------------------------------------------- |
+| C# / .NET  | Application development and data processing |
+| DuckDb     | Structured data storage                     |
 
-### Step 2️⃣ Create a Migration
-```bash
-dotnet ef migrations add MigrationName \
-  -o Migrations \
-  -s ../../Presentation/Bravo.Presentation/Bravo.Presentation.csproj
-```
+The solution will follow a modular architecture, separating data collection, processing, persistence, and analytical responsibilities.
+---
 
-### Step 3️⃣ Apply Migration to Database
-```bash
-dotnet ef database update \
-  -s ../../Presentation/Bravo.Presentation/Bravo.Presentation.csproj
-```
+## 🚀 Roadmap
 
-### Remove Latest Migration
-```bash
-dotnet ef migrations remove \
-  -s ../../Presentation/Bravo.Presentation/Bravo.Presentation.csproj
-```
+Development will follow an incremental approach.
 
-> 💡 **Pro Tip:** Create a migration script in your project for faster iterations.
+- [ ] Define the initial .NET solution structure.
+- [ ] Integrate with TSE electoral datasets.
+- [ ] Implement electoral data import and parsing.
+- [ ] Design and normalize the data model.
+- [ ] Implement data persistence.
+- [ ] Develop the first statistical analyses.
+- [ ] Implement historical election comparisons.
+- [ ] Introduce geographical and demographic analysis.
+- [ ] Develop statistical indicators and visualizations.
+- [ ] Document analytical methods and findings.
 
 ---
 
-## 📁 Project Structure
+## 📌 Project Philosophy
 
-```
-ddd-core-template/
-├── src/
-│   ├── Presentation/
-│   │   └── Bravo.Presentation/       # API entry point
-│   ├── Application/
-│   │   └── Bravo.Application/        # Business logic & use cases
-│   ├── Domain/
-│   │   ├── Bravo.Domain/             # Domain entities & rules
-│   │   └── Bravo.Shared/             # Shared domain models
-│   └── Infrastructure/
-│       ├── Bravo.Infrastructure.PostgreSQL/    # Database access
-│       ├── Bravo.Infrastructure.Dapper/        # Query optimization
-│       ├── Bravo.Infrastructure.Auth/          # Authentication
-│       └── Bravo.Infrastructure.Email/         # Email service
-├── Dockerfile
-├── docker-compose.yml
-└── .template.config/
-    └── template.json                         # Template configuration
-```
+BRAVO is built around the idea that publicly available data can be used to produce transparent, reproducible, and statistically grounded analyses.
+
+Every result should be interpreted in the context of its source, data quality, methodological limitations, and statistical significance.
+
+BRAVO is politically independent and does not advocate for any political party, candidate, or ideology.
+
+Its purpose is analytical, scientific, and educational.
+
+**Public Data. Independent Analysis. Evidence-Based Insights.**
 
 ---
 
-## 🛠️ Tech Stack
+## 📄 License
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| **Framework** | .NET | 10.0 |
-| **ORM** | Entity Framework Core | 7.0 |
-| **mORM** | Dapper | 2.1.72 |
-| **Database** | PostgreSQL | Latest |
-| **Query** | Dapper | Latest |
-| **API** | ASP.NET Core | 10.0 |
-| **Container** | Docker | Latest |
-
-> 📈 **Framework Versioning:** Updated yearly to stay current with .NET releases.
-
-## 📚 Learn More
-
-- [Domain-Driven Design by Eric Evans](https://www.domainlanguage.com/ddd/)
-- [.NET Official Docs](https://dotnet.microsoft.com/learn/dotnet/)
-- [Entity Framework Core](https://learn.microsoft.com/ef/core/)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-
-
-
-
-
-
-## 📄 To update packages 
-Install dotnet update tool:
-```bash
-dotnet tool install --global dotnet-outdated-tool
-```
-
-And update all instantly:
-```bash
-dotnet outdated --upgrade
-```
-
-
----
-
-<div align="center">
-
-**Made with ❤️ by the Nomad Squad**
-
-
-</div>
+BRAVO is an open-source project. Licensing information will be added once the repository license has been defined.
