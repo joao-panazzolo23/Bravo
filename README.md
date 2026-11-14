@@ -1,4 +1,4 @@
-﻿# 🇧🇷 BRAVO — Brazilian Voting
+﻿# 🇧🇷 BRAVO — Brazilian Voting Obscenities
 
 **Exploring Brazilian elections through data.**
 
@@ -145,3 +145,6 @@ Its purpose is analytical, scientific, and educational.
 ## 📄 License
 
 BRAVO is an open-source project. Licensing information will be added once the repository license has been defined.
+
+
+

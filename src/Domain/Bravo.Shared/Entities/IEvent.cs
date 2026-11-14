@@ -1,4 +1,4 @@
-﻿amespace Bravo.Shared.Entities
+﻿namespace Bravo.Shared.Entities
 {
-
+    public interface IEvent;
 }

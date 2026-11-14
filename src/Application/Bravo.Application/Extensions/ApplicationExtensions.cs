@@ -1,4 +1,5 @@
 ﻿using Bravo.Application.Behaviors;
+using Bravo.Shared.Notifications;
 using FluentValidation;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,7 @@ public static class ApplicationExtensions
     }
     public static IServiceCollection AddPipelineBehaviors(this IServiceCollection services)
     {
-        return services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        return services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>))
+                    .AddScoped<INotificationContext, NotificationContext>();
     }
 }
