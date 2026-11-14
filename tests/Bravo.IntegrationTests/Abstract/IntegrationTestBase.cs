@@ -17,13 +17,8 @@ public class IntegrationTestBase : IAsyncLifetime
         Client = pg.Factory.CreateClient();
         Db = new NpgsqlConnection(pg.ConnectionString);
     }
-    /// <summary>
-    /// Migrations will fail when database has no tables. That's expected behavior from Respawn.
-    /// 
-    /// This could also happen when Migrations are not created yet.
-    /// </summary>
-    /// <returns></returns>
-    public async ValueTask InitializeAsync()
+
+    public async Task InitializeAsync()
     {
         await Db.OpenAsync();
 
@@ -38,7 +33,7 @@ public class IntegrationTestBase : IAsyncLifetime
         });
     }
 
-    public async ValueTask DisposeAsync()
+    public async Task DisposeAsync()
     {
         await _respawner.ResetAsync(Db);
         await Db.DisposeAsync();

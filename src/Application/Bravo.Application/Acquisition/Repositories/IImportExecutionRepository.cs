@@ -1,4 +1,5 @@
 using Bravo.Domain.Acquisition.Entities;
+using Bravo.Domain.Acquisition.Enums;
 
 namespace Bravo.Application.Acquisition.Repositories;
 

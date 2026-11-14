@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
@@ -16,6 +16,7 @@
 		<ProjectReference Include="..\..\Application\Bravo.Application\Bravo.Application.csproj" />
 		<ProjectReference Include="..\..\Domain\Bravo.Domain\Bravo.Domain.csproj" />
 		<ProjectReference Include="..\..\Domain\Bravo.Shared\Bravo.Shared.csproj" />
+		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Acquisition\Bravo.Infrastructure.Acquisition.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Auth\Bravo.Infrastructure.Auth.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Email\Bravo.Infrastructure.Email.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.PostgreSQL.Dapper\Bravo.Infrastructure.PostgreSQL.Dapper.csproj" />

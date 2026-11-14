@@ -1,4 +1,5 @@
-﻿using Bravo.Application.Behaviors;
+using Bravo.Application.Acquisition.Handlers;
+using Bravo.Application.Behaviors;
 using Bravo.Shared.Notifications;
 using FluentValidation;
 using Mediator;
@@ -12,13 +13,10 @@ public static class ApplicationExtensions
     {
         return services.AddMediatorPattern()
                        .AddPipelineBehaviors()
-                       .AddValidators();
+                       .AddValidators()
+                       .AddScoped<IbgeImportHandler>();
     }
-    /// <summary>
-    /// Mediator gets the current assembly (the one he is installed/called)
-    /// </summary>
-    /// <param name="services"></param>
-    /// <returns></returns>
+
     public static IServiceCollection AddMediatorPattern(this IServiceCollection services)
     {
         return services.AddMediator(cfg => cfg.ServiceLifetime = ServiceLifetime.Scoped);
@@ -28,6 +26,7 @@ public static class ApplicationExtensions
     {
         return services.AddValidatorsFromAssembly(typeof(ApplicationExtensions).Assembly, includeInternalTypes: true);
     }
+
     public static IServiceCollection AddPipelineBehaviors(this IServiceCollection services)
     {
         return services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>))

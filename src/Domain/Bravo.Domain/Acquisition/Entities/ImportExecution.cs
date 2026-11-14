@@ -1,25 +1,7 @@
+using Bravo.Domain.Acquisition.Enums;
 using Bravo.Shared.Entities;
 
 namespace Bravo.Domain.Acquisition.Entities;
-
-public enum ImportOperationType
-{
-    IbgeGeography,
-    TseElectionMetadata,
-    TseCandidates,
-    TseResults
-}
-
-public enum ImportStatus
-{
-    Pending,
-    Running,
-    Completed,
-    CompletedWithErrors,
-    Failed,
-    CancellationRequested,
-    Cancelled
-}
 
 public class ImportExecution : Entity
 {

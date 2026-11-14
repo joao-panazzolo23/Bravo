@@ -1,4 +1,6 @@
+using Bravo.Domain.Acquisition.Entities;
 using Bravo.Domain.Auth.Entities;
+using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Users.Entities;
 using Bravo.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -14,21 +16,18 @@ public class PostgreSQLContext(DbContextOptions<PostgreSQLContext> options) : Db
     public DbSet<Permission> Permissions { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<RolePermission> RolePermissions { get; set; }
+    public DbSet<State> States { get; set; }
+    public DbSet<Municipality> Municipalities { get; set; }
+    public DbSet<ImportExecution> ImportExecutions { get; set; }
+    public DbSet<ImportCheckpoint> ImportCheckpoints { get; set; }
+    public DbSet<DatasetProvenance> DatasetProvenances { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.ApplyConfigurationsFromAssembly(typeof(PostgreSQLContext).Assembly);
     }
-    /// <summary>
-    /// At this very moment, DomainEvents are NOT implemented. We're only declaring ApplicationEvents at Application level
-    /// To set it inside entities, we would probably break clean arch/DDD principles using Mediator's interfaces
-    /// 
-    /// Or use mediator's object overload. Not sure if is a good idea, think about it.
-    /// </summary>
-    /// <param name="acceptAllChangesOnSuccess"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default(CancellationToken))
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         foreach (var entry in ChangeTracker.Entries<Entity>())
         {

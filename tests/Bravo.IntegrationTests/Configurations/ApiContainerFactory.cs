@@ -8,7 +8,6 @@ public class ApiContainerFactory : IAsyncLifetime
         new PostgreSqlBuilder("postgres:16-alpine")
             .Build();
 
-    public async ValueTask InitializeAsync() => await _db.StartAsync();
-    public async ValueTask DisposeAsync() => await _db.DisposeAsync();
-
+    public async Task InitializeAsync() => await _db.StartAsync();
+    public async Task DisposeAsync() => await _db.DisposeAsync();
 }
