@@ -2,9 +2,8 @@ using System.Text.Json.Serialization;
 
 namespace Bravo.Infrastructure.Acquisition.Providers;
 
-public record IbgeUfDto(
+public record IbgeFederativeUnitDto(
     [property: JsonPropertyName("id")] int Id,
-    [property: JsonPropertyName("sigla")] string? Sigla,
-    [property: JsonPropertyName("nome")] string? Nome
+    [property: JsonPropertyName("sigla")] string? Sail,
+    [property: JsonPropertyName("nome")] string? Name
 );
-
