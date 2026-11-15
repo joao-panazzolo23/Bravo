@@ -1,8 +1,6 @@
-using Bravo.Domain.Acquisition.Entities;
 using Bravo.Domain.Auth.Entities;
 using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Importing.Entities;
-using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Users.Entities;
 using Bravo.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -23,9 +21,6 @@ public class PostgreSQLContext(DbContextOptions<PostgreSQLContext> options) : Db
     public DbSet<ImportFailedRecord> ImportFailedRecords { get; set; }
     public DbSet<State> States { get; set; }
     public DbSet<Municipality> Municipalities { get; set; }
-    public DbSet<ImportExecution> ImportExecutions { get; set; }
-    public DbSet<ImportCheckpoint> ImportCheckpoints { get; set; }
-    public DbSet<DatasetProvenance> DatasetProvenances { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

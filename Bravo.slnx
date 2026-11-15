@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/src/">
+    <File Path="Dockerfile" />
+  </Folder>
+  <Folder Name="/src/Application/">
+    <Project Path="src/Application/Bravo.Application/Bravo.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Domain/">
+    <Project Path="src/Domain/Bravo.Domain/Bravo.Domain.csproj" />
+    <Project Path="src/Domain/Bravo.Shared/Bravo.Shared.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/Bravo.Infrastructure.Ibge/Bravo.Infrastructure.Ibge.csproj" />
+    <Project Path="src/Infrastructure/Bravo.Infrastructure.Auth/Bravo.Infrastructure.Auth.csproj" />
+    <Project Path="src/Infrastructure/Bravo.Infrastructure.Email/Bravo.Infrastructure.Email.csproj" />
+    <Project Path="src/Infrastructure/Bravo.Infrastructure.PostgreSQL.Dapper/Bravo.Infrastructure.PostgreSQL.Dapper.csproj" />
+    <Project Path="src/Infrastructure/Bravo.Infrastructure.PostgreSQL/Bravo.Infrastructure.PostgreSQL.csproj" />
+  </Folder>
+  <Folder Name="/src/Presentation/">
+    <Project Path="src/Presentation/Bravo.Presentation/Bravo.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Bravo.IntegrationTests/Bravo.IntegrationTests.csproj" />
+    <Project Path="tests/Bravo.UnitTests/Bravo.UnitTests.csproj" />
+  </Folder>
+</Solution>
