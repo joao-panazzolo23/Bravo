@@ -1,6 +1,5 @@
 using System.Net;
-using Bravo.Infrastructure.Acquisition.Options;
-using Bravo.Infrastructure.Acquisition.Providers;
+using Bravo.Application.Acquisition.Options;
 using Microsoft.Extensions.Logging;
 using Paramore.Fences;
 using Paramore.Fences.Retry;
@@ -8,16 +7,22 @@ using Paramore.Fences.Timeout;
 
 namespace Bravo.Infrastructure.Acquisition.Resilience;
 
-public static class IbgeResiliencePipelineFactory
+/// <summary>
+/// Builds one Fences pipeline per provider policy. The pipeline performs bounded retries with
+/// exponential backoff and jitter, honours Retry-After, never retries permanent 4xx responses
+/// and applies a per-attempt timeout.
+/// </summary>
+public static class ProviderResiliencePipelineFactory
 {
-    private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromSeconds(60);
 
     public static ResiliencePipeline<HttpResponseMessage> Create(
-        IbgeOptions options,
-        ILogger<IbgeProvider> logger)
+        ProviderOptions options,
+        ILogger logger)
     {
         var maxRetryAttempts = Math.Max(1, options.MaxRetryAttempts);
         var baseDelay = TimeSpan.FromMilliseconds(Math.Max(1, options.RetryBaseDelayMs));
+        var providerName = new Uri(options.BaseAddress).Host;
 
         return new ResiliencePipelineBuilder<HttpResponseMessage>()
             .AddRetry(new RetryStrategyOptions<HttpResponseMessage>
@@ -33,7 +38,8 @@ public static class IbgeResiliencePipelineFactory
                 {
                     arguments.Outcome.Result?.Dispose();
                     logger.LogWarning(
-                        "IBGE request failed with {Failure}. Retrying in {RetryDelayMs} ms (attempt {AttemptNumber} of {MaxAttempts}).",
+                        "{Provider} request failed with {Failure}. Retrying in {RetryDelayMs} ms (attempt {AttemptNumber} of {MaxAttempts}).",
+                        providerName,
                         Describe(arguments.Outcome),
                         arguments.RetryDelay.TotalMilliseconds,
                         arguments.AttemptNumber,
@@ -46,7 +52,7 @@ public static class IbgeResiliencePipelineFactory
     }
 
     private static bool IsTransient(Outcome<HttpResponseMessage> outcome) =>
-        outcome.Exception is HttpRequestException or TimeoutRejectedException
+        outcome.Exception is HttpRequestException or TimeoutRejectedException or IOException
         || outcome.Result is { } response && IsTransient(response.StatusCode);
 
     private static bool IsTransient(HttpStatusCode statusCode) =>

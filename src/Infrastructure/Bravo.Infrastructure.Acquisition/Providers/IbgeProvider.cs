@@ -1,20 +1,20 @@
+using Bravo.Application.Acquisition.Services;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Bravo.Application.Acquisition.Providers;
-using Bravo.Infrastructure.Acquisition.RateLimiting;
-using Microsoft.Extensions.Logging;
-using Paramore.Fences;
+using Bravo.Infrastructure.Acquisition.Http;
+using Bravo.Application.Acquisition.Options;
 
 namespace Bravo.Infrastructure.Acquisition.Providers;
 
-public sealed class IbgeProvider(
-    IHttpClientFactory httpClientFactory,
-    IbgeRateLimiter rateLimiter,
-    ResiliencePipeline<HttpResponseMessage> pipeline,
-    ILogger<IbgeProvider> logger
-) : IIbgeProvider
+/// <summary>
+/// IBGE locality provider. The official API returns JSON arrays of states and
+/// municipalities; both are streamed from a temporary file with
+/// <see cref="JsonSerializer.DeserializeAsyncEnumerable{TValue}"/> so the dataset is never
+/// materialized in memory.
+/// </summary>
+public sealed class IbgeProvider(DatasetFetcher fetcher, ProviderOptions policy) : IIbgeProvider
 {
-    private const string ClientName = "ibge";
     private const string StatesPath = "api/v1/localidades/estados?orderBy=nome";
     private const string MunicipalitiesPath = "api/v1/localidades/municipios?orderBy=nome";
 
@@ -23,65 +23,122 @@ public sealed class IbgeProvider(
         PropertyNameCaseInsensitive = true
     };
 
+    private Uri BaseUri => new(policy.BaseAddress);
+
     public Task<IbgeDatasetInfo> GetDatasetInfo(CancellationToken ct = default)
     {
         var info = new IbgeDatasetInfo(
-            StatesUrl: StatesPath,
-            MunicipalitiesUrl: MunicipalitiesPath,
+            StatesUrl: new Uri(BaseUri, StatesPath).ToString(),
+            MunicipalitiesUrl: new Uri(BaseUri, MunicipalitiesPath).ToString(),
             Version: DateTime.UtcNow.ToString("yyyyMMdd"),
-            Format: "JSON"
-        );
+            Format: "JSON");
+
         return Task.FromResult(info);
     }
 
-    public async IAsyncEnumerable<IbgeStateRecord> StreamStates([EnumeratorCancellation] CancellationToken ct = default)
+    public Uri GetSourceUri(DatasetScope scope) => scope switch
     {
-        using var response = await SendAsync(StatesPath, ct);
-        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        DatasetScope.States => new Uri(BaseUri, StatesPath),
+        DatasetScope.Municipalities => new Uri(BaseUri, MunicipalitiesPath),
+        _ => throw new ArgumentOutOfRangeException(nameof(scope))
+    };
 
-        await foreach (var item in JsonSerializer.DeserializeAsyncEnumerable<IbgeEstadoDto>(stream, JsonOptions, ct))
+    public Task<CachedDownload> DownloadStates(
+        Guid executionId,
+        ConditionalRequest? conditional = null,
+        CancellationToken ct = default) =>
+        DownloadRequired(executionId, DatasetScope.States, conditional, ct);
+
+    public Task<CachedDownload> DownloadMunicipalities(
+        Guid executionId,
+        ConditionalRequest? conditional = null,
+        CancellationToken ct = default) =>
+        DownloadRequired(executionId, DatasetScope.Municipalities, conditional, ct);
+
+    private async Task<CachedDownload> DownloadRequired(
+        Guid executionId,
+        DatasetScope scope,
+        ConditionalRequest? conditional,
+        CancellationToken ct)
+    {
+        var key = scope == DatasetScope.States ? "ibge-states" : "ibge-municipalities";
+        var downloaded = await fetcher.DownloadAsync(executionId, key, GetSourceUri(scope), conditional, ct);
+
+        if (downloaded is null)
         {
-            if (item is null) continue;
+            // A 304 means the previously acquired file is still current. IBGE does not
+            // currently serve such validators, so reaching this branch indicates that a
+            // conditional request was sent when no cached file is available.
+            throw new InvalidOperationException($"IBGE dataset '{key}' was reported as unmodified but no local copy exists.");
+        }
 
-            logger.LogInformation($"Processing State: {item.Name}");
+        return downloaded;
+    }
 
-            yield return new IbgeStateRecord(
-                item.Id,
-                item.Sail,
-                item.Name,
-                item.Region?.Sail ?? item.Region?.Name ?? string.Empty
-            );
+    public async IAsyncEnumerable<ParsedRecord<IbgeStateRecord>> StreamStates(
+        string filePath,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await using var stream = OpenRead(filePath);
+
+        await foreach (var item in JsonSerializer
+                           .DeserializeAsyncEnumerable<IbgeEstadoDto>(stream, JsonOptions, ct)
+                           .ConfigureAwait(false))
+        {
+            if (item is null)
+            {
+                continue;
+            }
+
+            if (item.Id <= 0 || string.IsNullOrWhiteSpace(item.Name))
+            {
+                yield return new ParsedRecord<IbgeStateRecord>(null, $"state id={item.Id}");
+                continue;
+            }
+
+            yield return new ParsedRecord<IbgeStateRecord>(
+                new IbgeStateRecord(
+                    item.Id,
+                    item.Sail,
+                    item.Name,
+                    item.Region?.Sail ?? item.Region?.Name ?? string.Empty),
+                $"state {item.Id}");
         }
     }
 
-    public async IAsyncEnumerable<IbgeMunicipalityRecord> StreamMunicipalities([EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<ParsedRecord<IbgeMunicipalityRecord>> StreamMunicipalities(
+        string filePath,
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
-        using var response = await SendAsync(MunicipalitiesPath, ct);
+        await using var stream = OpenRead(filePath);
 
-        await using var stream = await response.Content.ReadAsStreamAsync(ct);
-
-        await foreach (var item in JsonSerializer.DeserializeAsyncEnumerable<IbgeTownDto>(stream, JsonOptions, ct))
+        await foreach (var item in JsonSerializer
+                           .DeserializeAsyncEnumerable<IbgeTownDto>(stream, JsonOptions, ct)
+                           .ConfigureAwait(false))
         {
-            if (item is null) continue;
-            yield return new IbgeMunicipalityRecord(
-                item.Id,
-                item.Nome,
-                item.FederativeUnit?.Id ?? 0
-            );
+            if (item is null)
+            {
+                continue;
+            }
+
+            var state = item.ResolveState();
+            if (item.Id <= 0 || string.IsNullOrWhiteSpace(item.Nome) || state?.Id is null or <= 0)
+            {
+                yield return new ParsedRecord<IbgeMunicipalityRecord>(null, $"municipality id={item.Id}");
+                continue;
+            }
+
+            yield return new ParsedRecord<IbgeMunicipalityRecord>(
+                new IbgeMunicipalityRecord(item.Id, item.Nome, state.Id),
+                $"municipality {item.Id}");
         }
     }
 
-    private async Task<HttpResponseMessage> SendAsync(string relativeUrl, CancellationToken cancellationToken)
-    {
-        using var lease = await rateLimiter.AcquireAsync(cancellationToken);
-
-        var client = httpClientFactory.CreateClient(ClientName);
-
-        var response = await pipeline.ExecuteAsync(
-            token => new ValueTask<HttpResponseMessage>(
-                client.GetAsync(relativeUrl, HttpCompletionOption.ResponseHeadersRead, token)),
-            cancellationToken);
-
-        return response;
-    }
+    private static FileStream OpenRead(string filePath) => new(
+        filePath,
+        FileMode.Open,
+        FileAccess.Read,
+        FileShare.Read,
+        81920,
+        FileOptions.Asynchronous | FileOptions.SequentialScan);
 }

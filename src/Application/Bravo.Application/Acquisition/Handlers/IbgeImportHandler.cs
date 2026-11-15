@@ -1,157 +1,234 @@
+using Bravo.Application.Acquisition.Options;
 using Bravo.Application.Acquisition.Providers;
 using Bravo.Application.Acquisition.Repositories;
 using Bravo.Application.Acquisition.Services;
 using Bravo.Domain.Acquisition.Entities;
-using Bravo.Domain.Acquisition.Enums;
 using Bravo.Shared.Data;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Bravo.Application.Acquisition.Handlers;
 
 public class IbgeImportHandler(
-    IImportExecutionRepository executionRepository,
-    IImportCheckpointRepository checkpointRepository,
+    ImportExecutionRunner runner,
     IDatasetProvenanceRepository provenanceRepository,
     IIbgeProvider ibgeProvider,
     IGeographyPersistenceService persistenceService,
+    ITemporaryFileStore fileStore,
     IUnityOfWork unityOfWork,
+    IOptions<AcquisitionOptions> options,
     ILogger<IbgeImportHandler> logger
 )
 {
+    private const string StatesKey = "ibge-states";
+    private const string MunicipalitiesKey = "ibge-municipalities";
+    private const int StateBatchSize = 100;
+    private const int MunicipalityBatchSize = 1000;
+
     public async Task ExecuteAsync(Guid executionId, CancellationToken cancellationToken)
     {
-        var execution = await executionRepository.GetById(executionId, cancellationToken);
+        var execution = await runner.OpenAsync(executionId, cancellationToken);
         if (execution is null)
         {
-            logger.LogError("Execution with id {ExecutionId} not found.", executionId);
             return;
         }
 
-        if (execution.Status is ImportStatus.CancellationRequested)
-        {
-            execution.MarkCancelled("Cancelled prior to execution start.");
-            await executionRepository.Update(execution, CancellationToken.None);
-            await unityOfWork.Commit();
-            return;
-        }
+        var counters = new Counters();
+        var downloadedFiles = new List<string>();
+        Task<CachedDownload>? pendingStates = null;
+        Task<CachedDownload>? pendingMunicipalities = null;
 
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            execution.MarkRunning();
-            execution.UpdateProgress("Starting", 0, 0);
-            await executionRepository.Update(execution, cancellationToken);
-            await unityOfWork.Commit();
-
             var datasetInfo = await ibgeProvider.GetDatasetInfo(cancellationToken);
-            var provenance = DatasetProvenance.Create(
-                execution.Id,
-                "IBGE",
-                "ibge-localidades",
-                datasetInfo.StatesUrl,
-                datasetInfo.Version,
-                datasetInfo.Format
-            );
-            await provenanceRepository.Add(provenance, cancellationToken);
-            await unityOfWork.Commit();
+            var completed = await runner.GetCompletedKeysAsync(execution, cancellationToken);
 
-            var statesCheckpoint = await checkpointRepository.GetLatest(execution.Id, "ibge-states", cancellationToken);
-            var statesPersisted = statesCheckpoint?.RecordsCompleted ?? 0;
+            // States and municipalities are independent datasets. They are downloaded
+            // concurrently within the configured bound, but persisted sequentially because
+            // municipalities reference the states.
+            await runner.SetStageAsync(execution, "DownloadingGeography", cancellationToken);
 
-            if (statesCheckpoint is null)
+            var allowConcurrent = options.Value.MaxConcurrentDownloads >= 2;
+            if (!completed.Contains(StatesKey))
             {
-                execution.UpdateProgress("StreamingStates", 0, 0);
-                await executionRepository.Update(execution, cancellationToken);
-                await unityOfWork.Commit();
-
-                var statesBatch = new List<IbgeStateRecord>(50);
-                await foreach (var state in ibgeProvider.StreamStates(cancellationToken))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    statesBatch.Add(state);
-                    if (statesBatch.Count >= 50)
-                    {
-                        var inserted = await persistenceService.UpsertStates(statesBatch, cancellationToken);
-                        statesPersisted += inserted;
-                        statesBatch.Clear();
-                    }
-                }
-
-                if (statesBatch.Count > 0)
-                {
-                    var inserted = await persistenceService.UpsertStates(statesBatch, cancellationToken);
-                    statesPersisted += inserted;
-                    statesBatch.Clear();
-                }
-
-                var statesCp = ImportCheckpoint.Create(execution.Id, "ibge-states", $"{{\"states\": {statesPersisted}}}", statesPersisted);
-                await checkpointRepository.Save(statesCp, cancellationToken);
-                execution.UpdateProgress("StatesCompleted", statesPersisted, statesPersisted);
-                await executionRepository.Update(execution, cancellationToken);
-                await unityOfWork.Commit();
+                pendingStates = ibgeProvider.DownloadStates(execution.Id, null, cancellationToken);
             }
 
-            var muniCheckpoint = await checkpointRepository.GetLatest(execution.Id, "ibge-municipalities", cancellationToken);
-            var muniPersisted = muniCheckpoint?.RecordsCompleted ?? 0;
-
-            if (muniCheckpoint is null)
+            if (!completed.Contains(MunicipalitiesKey))
             {
-                execution.UpdateProgress("StreamingMunicipalities", statesPersisted, statesPersisted);
-                await executionRepository.Update(execution, cancellationToken);
-                await unityOfWork.Commit();
-
-                var muniBatch = new List<IbgeMunicipalityRecord>(500);
-                var muniProcessed = 0;
-
-                await foreach (var muni in ibgeProvider.StreamMunicipalities(cancellationToken))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    muniBatch.Add(muni);
-                    muniProcessed++;
-
-                    if (muniBatch.Count >= 500)
-                    {
-                        var inserted = await persistenceService.UpsertMunicipalities(muniBatch, cancellationToken);
-                        muniPersisted += inserted;
-                        muniBatch.Clear();
-
-                        execution.UpdateProgress("StreamingMunicipalities", statesPersisted + muniProcessed, statesPersisted + muniPersisted);
-                        await executionRepository.Update(execution, cancellationToken);
-                        await unityOfWork.Commit();
-                    }
-                }
-
-                if (muniBatch.Count > 0)
-                {
-                    var inserted = await persistenceService.UpsertMunicipalities(muniBatch, cancellationToken);
-                    muniPersisted += inserted;
-                    muniBatch.Clear();
-                }
-
-                var muniCp = ImportCheckpoint.Create(execution.Id, "ibge-municipalities", $"{{\"municipalities\": {muniPersisted}}}", muniPersisted);
-                await checkpointRepository.Save(muniCp, cancellationToken);
-                execution.UpdateProgress("MunicipalitiesCompleted", statesPersisted + muniProcessed, statesPersisted + muniPersisted);
-                await executionRepository.Update(execution, cancellationToken);
-                await unityOfWork.Commit();
+                pendingMunicipalities = allowConcurrent
+                    ? ibgeProvider.DownloadMunicipalities(execution.Id, null, cancellationToken)
+                    : null;
             }
 
-            execution.MarkCompleted();
-            await executionRepository.Update(execution, cancellationToken);
-            await unityOfWork.Commit();
+            if (pendingStates is not null)
+            {
+                var statesFile = await pendingStates;
+                downloadedFiles.Add(statesFile.FilePath);
+                counters.BytesDownloaded += statesFile.SizeBytes;
+
+                var provenance = DatasetProvenance.Create(
+                    execution.Id,
+                    "IBGE",
+                    "ibge-states",
+                    ibgeProvider.GetSourceUri(DatasetScope.States).ToString(),
+                    datasetInfo.Version,
+                    datasetInfo.Format,
+                    Path.GetFileName(statesFile.FilePath));
+
+                provenance.SetContentHash(statesFile.Sha256);
+                provenance.SetFileSizeBytes(statesFile.SizeBytes);
+                await provenanceRepository.Add(provenance, cancellationToken);
+                await unityOfWork.Commit();
+
+                await runner.SetStageAsync(execution, "StreamingStates", cancellationToken);
+                await ImportStatesAsync(execution, statesFile.FilePath, counters, cancellationToken);
+            }
+            else
+            {
+                logger.LogInformation("Skipping states dataset: checkpoint already completed for {ExecutionId}.", executionId);
+            }
+
+            if (pendingMunicipalities is not null || (pendingStates is null && !completed.Contains(MunicipalitiesKey)))
+            {
+                var municipalitiesFile = pendingMunicipalities is not null
+                    ? await pendingMunicipalities
+                    : await ibgeProvider.DownloadMunicipalities(execution.Id, null, cancellationToken);
+
+                downloadedFiles.Add(municipalitiesFile.FilePath);
+                counters.BytesDownloaded += municipalitiesFile.SizeBytes;
+
+                var provenance = DatasetProvenance.Create(
+                    execution.Id,
+                    "IBGE",
+                    "ibge-municipalities",
+                    ibgeProvider.GetSourceUri(DatasetScope.Municipalities).ToString(),
+                    datasetInfo.Version,
+                    datasetInfo.Format,
+                    Path.GetFileName(municipalitiesFile.FilePath));
+
+                provenance.SetContentHash(municipalitiesFile.Sha256);
+                provenance.SetFileSizeBytes(municipalitiesFile.SizeBytes);
+                await provenanceRepository.Add(provenance, cancellationToken);
+                await unityOfWork.Commit();
+
+                await runner.SetStageAsync(execution, "StreamingMunicipalities", cancellationToken);
+                await ImportMunicipalitiesAsync(execution, municipalitiesFile.FilePath, counters, cancellationToken);
+            }
+            else
+            {
+                logger.LogInformation("Skipping municipalities dataset: checkpoint already completed for {ExecutionId}.", executionId);
+            }
+
+            await runner.CompleteAsync(execution, counters, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            execution.MarkCancelled("Import was cancelled by request.");
-            await executionRepository.Update(execution, CancellationToken.None);
-            await unityOfWork.Commit();
+            await runner.CancelledAsync(execution, "IBGE import was cancelled.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Import failed for execution {ExecutionId}", executionId);
-            execution.MarkFailed(ex.Message);
-            await executionRepository.Update(execution, CancellationToken.None);
-            await unityOfWork.Commit();
+            logger.LogError(ex, "IBGE import failed for execution {ExecutionId}.", executionId);
+            await runner.FailedAsync(execution, ex.Message);
+        }
+        finally
+        {
+            foreach (var file in downloadedFiles)
+            {
+                fileStore.TryDelete(file);
+            }
+        }
+    }
+
+    private async Task ImportStatesAsync(
+        ImportExecution execution,
+        string filePath,
+        Counters counters,
+        CancellationToken ct)
+    {
+        var rejections = new List<RejectedRecord>();
+        var statesPersisted = 0;
+
+        await foreach (var batch in BatchStream.Chunk(
+            SelectRecords(ibgeProvider.StreamStates(filePath, ct), counters, rejections),
+            StateBatchSize,
+            ct))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var result = await persistenceService.UpsertStates(batch, ct);
+            counters.Processed += batch.Count;
+            counters.Persisted += result.Inserted + result.Updated;
+            counters.Skipped += result.Skipped;
+            counters.Batches++;
+            statesPersisted += result.Inserted + result.Updated;
+
+            await runner.ReportProgressAsync(execution, "StreamingStates", counters, ct);
+        }
+
+        counters.Rejected += rejections.Count;
+        await runner.RecordRejectionsAsync(execution.Id, StatesKey, rejections, ct);
+        await runner.CheckpointAsync(
+            execution,
+            StatesKey,
+            $"{{\"states\":{statesPersisted}}}",
+            statesPersisted,
+            counters,
+            ct);
+    }
+
+    private async Task ImportMunicipalitiesAsync(
+        ImportExecution execution,
+        string filePath,
+        Counters counters,
+        CancellationToken ct)
+    {
+        var rejections = new List<RejectedRecord>();
+        var persisted = 0;
+
+        await foreach (var batch in BatchStream.Chunk(
+            SelectRecords(ibgeProvider.StreamMunicipalities(filePath, ct), counters, rejections),
+            MunicipalityBatchSize,
+            ct))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var result = await persistenceService.UpsertMunicipalities(batch, ct);
+            counters.Processed += batch.Count;
+            counters.Persisted += result.Inserted + result.Updated;
+            counters.Skipped += result.Skipped;
+            counters.Batches++;
+            persisted += result.Inserted + result.Updated;
+
+            await runner.ReportProgressAsync(execution, "StreamingMunicipalities", counters, ct);
+        }
+
+        counters.Rejected += rejections.Count;
+        await runner.RecordRejectionsAsync(execution.Id, MunicipalitiesKey, rejections, ct);
+        await runner.CheckpointAsync(
+            execution,
+            MunicipalitiesKey,
+            $"{{\"municipalities\":{persisted}}}",
+            persisted,
+            counters,
+            ct);
+    }
+
+    private static async IAsyncEnumerable<T> SelectRecords<T>(
+        IAsyncEnumerable<ParsedRecord<T>> source,
+        Counters counters,
+        List<RejectedRecord> rejections,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await foreach (var parsed in source.WithCancellation(ct).ConfigureAwait(false))
+        {
+            if (parsed.Record is null)
+            {
+                rejections.Add(new RejectedRecord("Unparseable record.", parsed.SourceReference, null));
+                continue;
+            }
+
+            yield return parsed.Record;
         }
     }
 }

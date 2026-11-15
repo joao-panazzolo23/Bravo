@@ -21,9 +21,21 @@ public sealed class DatasetProvenanceRepository(PostgreSQLContext context) : IDa
     public async Task<DatasetProvenance?> GetLatest(string provider, string datasetIdentifier, CancellationToken ct = default)
     {
         return await context.DatasetProvenances
+            .AsNoTracking()
             .Where(x => x.Provider == provider && x.DatasetIdentifier == datasetIdentifier)
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(ct);
     }
-}
 
+    public async Task<DatasetProvenance?> GetLatestSuccessful(string provider, string datasetIdentifier, CancellationToken ct = default)
+    {
+        return await context.DatasetProvenances
+            .AsNoTracking()
+            .Where(x => x.Provider == provider
+                        && x.DatasetIdentifier == datasetIdentifier
+                        && (x.Execution.Status == Domain.Acquisition.Enums.ImportStatus.Completed
+                            || x.Execution.Status == Domain.Acquisition.Enums.ImportStatus.CompletedWithErrors))
+            .OrderByDescending(x => x.FetchedAt)
+            .FirstOrDefaultAsync(ct);
+    }
+}

@@ -18,7 +18,7 @@ internal sealed class DatasetProvenanceMap : EntityMapper<DatasetProvenance>
             .IsRequired();
 
         builder.Property(x => x.DatasetIdentifier)
-            .HasMaxLength(150)
+            .HasMaxLength(200)
             .IsRequired();
 
         builder.Property(x => x.SourceUrl)
@@ -35,6 +35,11 @@ internal sealed class DatasetProvenanceMap : EntityMapper<DatasetProvenance>
 
         builder.Property(x => x.FileSizeBytes);
 
+        builder.Property(x => x.ETag)
+            .HasMaxLength(200);
+
+        builder.Property(x => x.SourceLastModifiedAt);
+
         builder.Property(x => x.FormatDescription)
             .HasMaxLength(50);
 
@@ -45,7 +50,6 @@ internal sealed class DatasetProvenanceMap : EntityMapper<DatasetProvenance>
             .IsRequired();
 
         builder.HasIndex(x => new { x.ExecutionId, x.DatasetIdentifier });
-        builder.HasIndex(x => new { x.Provider, x.DatasetIdentifier });
+        builder.HasIndex(x => new { x.Provider, x.DatasetIdentifier, x.FetchedAt });
     }
 }
-

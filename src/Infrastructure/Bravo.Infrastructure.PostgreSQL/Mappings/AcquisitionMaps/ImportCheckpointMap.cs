@@ -14,7 +14,7 @@ internal sealed class ImportCheckpointMap : EntityMapper<ImportCheckpoint>
             .IsRequired();
 
         builder.Property(x => x.DatasetKey)
-            .HasMaxLength(100)
+            .HasMaxLength(150)
             .IsRequired();
 
         builder.Property(x => x.CheckpointData)
@@ -27,7 +27,9 @@ internal sealed class ImportCheckpointMap : EntityMapper<ImportCheckpoint>
         builder.Property(x => x.CheckpointedAt)
             .IsRequired();
 
-        builder.HasIndex(x => new { x.ExecutionId, x.DatasetKey });
+        // One checkpoint per execution and dataset key: recovery always reads the latest
+        // committed state instead of accumulating duplicate rows per retry.
+        builder.HasIndex(x => new { x.ExecutionId, x.DatasetKey })
+            .IsUnique();
     }
 }
-

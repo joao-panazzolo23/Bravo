@@ -14,7 +14,15 @@ public static class ApplicationExtensions
         return services.AddMediatorPattern()
                        .AddPipelineBehaviors()
                        .AddValidators()
-                       .AddScoped<IbgeImportHandler>();
+                       .AddImportHandlers();
+    }
+
+    public static IServiceCollection AddImportHandlers(this IServiceCollection services)
+    {
+        return services.AddScoped<IbgeImportHandler>()
+                       .AddScoped<FgvCrosswalkImportHandler>()
+                       .AddScoped<TseCandidatesImportHandler>()
+                       .AddScoped<TseResultsImportHandler>();
     }
 
     public static IServiceCollection AddMediatorPattern(this IServiceCollection services)

@@ -2,6 +2,11 @@ using Bravo.Shared.Entities;
 
 namespace Bravo.Domain.Acquisition.Entities;
 
+/// <summary>
+/// Provenance of one acquired dataset: where it came from, how it was validated and which
+/// execution produced it. It is appended per acquisition so that historical imports remain
+/// traceable even after a dataset is replaced at the source.
+/// </summary>
 public class DatasetProvenance : Entity
 {
     public Guid ExecutionId { get; private set; }
@@ -13,6 +18,8 @@ public class DatasetProvenance : Entity
     public DateTime? DataDate { get; private set; }
     public string? ContentHash { get; private set; }
     public long? FileSizeBytes { get; private set; }
+    public string? ETag { get; private set; }
+    public DateTime? SourceLastModifiedAt { get; private set; }
     public string? FormatDescription { get; private set; }
     public string? Version { get; private set; }
     public DateTime FetchedAt { get; private set; }
@@ -31,12 +38,12 @@ public class DatasetProvenance : Entity
         var provenance = new DatasetProvenance
         {
             ExecutionId = executionId,
-            Provider = provider,
-            DatasetIdentifier = datasetIdentifier,
-            SourceUrl = sourceUrl,
-            Version = version,
-            FormatDescription = formatDescription,
-            OriginalFilename = originalFilename,
+            Provider = Truncate(provider, 50),
+            DatasetIdentifier = Truncate(datasetIdentifier, 200),
+            SourceUrl = Truncate(sourceUrl, 1000),
+            Version = Truncate(version, 50),
+            FormatDescription = Truncate(formatDescription, 50),
+            OriginalFilename = Truncate(originalFilename, 250),
             FetchedAt = DateTime.UtcNow
         };
         provenance.SetCreatedAt(DateTime.UtcNow);
@@ -44,7 +51,20 @@ public class DatasetProvenance : Entity
         return provenance;
     }
 
-    public void SetContentHash(string hash) => ContentHash = hash;
+    public void SetContentHash(string hash) => ContentHash = Truncate(hash, 128);
     public void SetFileSizeBytes(long size) => FileSizeBytes = size;
     public void SetDataDate(DateTime date) => DataDate = date;
+    public void SetETag(string? etag) => ETag = Truncate(etag, 200);
+    public void SetSourceLastModifiedAt(DateTime? lastModified) => SourceLastModifiedAt = lastModified;
+
+    /// <summary>
+    /// Source metadata can exceed the configured column lengths (for example a long original
+    /// filename). Provenance must never fail an import because of a descriptive field, so the
+    /// values are bounded here rather than at the persistence layer.
+    /// </summary>
+    private static string? Truncate(string? value, int maxLength)
+    {
+        if (value is null) return null;
+        return value.Length <= maxLength ? value : value[..maxLength];
+    }
 }

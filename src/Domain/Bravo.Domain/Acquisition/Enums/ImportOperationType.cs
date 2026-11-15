@@ -5,6 +5,6 @@ public enum ImportOperationType
     IbgeGeography,
     TseElectionMetadata,
     TseCandidates,
-    TseResults
+    TseResults,
+    FgvMunicipalityCrosswalk
 }
-

@@ -4,6 +4,10 @@ using Bravo.Application.Acquisition.Services;
 
 namespace Bravo.Infrastructure.Acquisition.Queue;
 
+/// <summary>
+/// In-process dispatch channel. It is deliberately not the source of truth for executions:
+/// rows are persisted in PostgreSQL first, and this channel only wakes the background worker.
+/// </summary>
 public sealed class ImportExecutionQueue : IImportExecutionQueue
 {
     private readonly Channel<Guid> _channel = Channel.CreateBounded<Guid>(
@@ -12,8 +16,7 @@ public sealed class ImportExecutionQueue : IImportExecutionQueue
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false
-        }
-    );
+        });
 
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _activeExecutions = new();
 
@@ -48,4 +51,3 @@ public sealed class ImportExecutionQueue : IImportExecutionQueue
         return false;
     }
 }
-

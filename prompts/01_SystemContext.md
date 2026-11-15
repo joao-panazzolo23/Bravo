@@ -142,6 +142,7 @@ An electoral result represents a historical fact associated with an electoral ev
 Evaluate a structure similar to:
 
 **PollingSectionResult**
+
 - ElectionId.
 - ElectionRoundId.
 - ElectoralContestId.
@@ -170,6 +171,7 @@ Separate candidate voting facts from general electoral statistics for a geograph
 Evaluate structures similar to:
 
 **PollingSectionStatistics**
+
 - ElectionId.
 - ElectionRoundId.
 - PollingSectionId.
@@ -318,17 +320,17 @@ Do not force all persistence operations through Dapper either.
 
 The choice must be based on the workload:
 
-| Workload | Preferred approach |
-|---|---|
-| Domain-oriented CRUD | EF Core |
-| Relational configuration | EF Core |
-| Migrations | EF Core |
-| Bulk ingestion | Npgsql COPY |
-| Large analytical queries | Dapper + SQL |
-| Complex aggregations | PostgreSQL SQL |
-| High-volume batch updates | Set-based SQL |
-| Domain entity tracking | EF Core |
-| Lightweight read projections | Dapper |
+| Workload                     | Preferred approach |
+| ---------------------------- | ------------------ |
+| Domain-oriented CRUD         | EF Core            |
+| Relational configuration     | EF Core            |
+| Migrations                   | EF Core            |
+| Bulk ingestion               | Npgsql COPY        |
+| Large analytical queries     | Dapper + SQL       |
+| Complex aggregations         | PostgreSQL SQL     |
+| High-volume batch updates    | Set-based SQL      |
+| Domain entity tracking       | EF Core            |
+| Lightweight read projections | Dapper             |
 
 This is the expected starting strategy, but validate it against the actual project architecture.
 
@@ -582,7 +584,7 @@ Do not invent benchmark results.
 
 ## 12. Scope Restrictions
 
-Do NOT implement:
+Do NOT implement at this very moment:
 
 - Endpoints.
 - Controllers.
@@ -601,6 +603,8 @@ Do NOT implement:
 - Premature distributed infrastructure.
 - Unnecessary caching systems.
 - Premature database partitioning.
+
+These things will be made from 2 to 4 md files.
 
 Do not create fictional data to fill historical gaps.
 

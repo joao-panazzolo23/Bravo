@@ -9,6 +9,9 @@ public class StartImportCommandValidator : AbstractValidator<StartImportCommand>
     {
         RuleFor(x => x.OperationType)
             .IsInEnum();
+
+        RuleFor(x => x.Scope)
+            .MaximumLength(200)
+            .WithMessage("The import scope must not exceed 200 characters.");
     }
 }
-
