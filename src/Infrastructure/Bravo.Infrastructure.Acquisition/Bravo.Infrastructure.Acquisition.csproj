@@ -11,8 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+   responsabilidade unica n existe neh
     <PackageReference Include="Dapper" Version="2.1.72" />
-    <PackageReference Include="Npgsql" Version="10.0.2" />
+    <PackageReference Include="Npgsql" Version="10.0.2" /> -->
     <PackageReference Include="Paramore.Fences.Core" Version="9.0.0" />
   </ItemGroup>
 

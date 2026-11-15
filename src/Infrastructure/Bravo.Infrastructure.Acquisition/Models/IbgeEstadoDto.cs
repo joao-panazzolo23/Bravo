@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Bravo.Infrastructure.Acquisition.Providers;
+namespace Bravo.Infrastructure.Acquisition.Models;
 
 public record IbgeEstadoDto(
     [property: JsonPropertyName("id")] int Id,
