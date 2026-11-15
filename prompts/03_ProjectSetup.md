@@ -36,6 +36,7 @@ The operation must be explicitly initiated by an API request.
 Consider exposing separate operations for different data domains rather than creating one endpoint that indiscriminately downloads everything.
 
 For example:
+
 - Synchronize IBGE geographic reference data.
 - Acquire TSE election metadata.
 - Acquire election results for a specific election and round.
@@ -172,22 +173,26 @@ The API should return a useful execution summary and make failures diagnosable.
 Respect the existing Clean Architecture implementation and project structure.
 
 **Domain**
+
 - Contains the actual domain concepts and business invariants.
 - Must not depend on HTTP, external providers, file formats, or database implementation details.
 
 **Application**
+
 - Defines acquisition use cases.
 - Coordinates the import workflow.
 - Defines the necessary provider and persistence contracts.
 - Handles execution orchestration and cancellation.
 
 **Infrastructure**
+
 - Implements TSE, IBGE, FGV, and other external providers.
 - Implements HTTP communication and rate limiting.
 - Handles downloading, decompression, parsing, and external format conversion.
 - Implements persistence using the existing database infrastructure.
 
 **Presentation**
+
 - Exposes controller endpoints to initiate acquisition operations.
 - Handles authorization, request validation, and HTTP responses.
 - Must not contain downloading, parsing, or persistence logic.
@@ -226,6 +231,8 @@ Do not introduce new projects, abstractions, interfaces, or dependencies without
 
 Do not implement every possible historical dataset immediately. Prioritize the datasets required by the current electoral analysis scope.
 
+Do not use fucking try catches everywhere. Do not use it at all.
+
 After implementation:
 
 - Build the entire solution.
@@ -235,7 +242,6 @@ After implementation:
 - Test cancellation and failure handling.
 - Test repeated imports for idempotency.
 - Verify database integrity after successful and unsuccessful executions.
-
 
 ## 10. Concurrent Acquisition and Incremental Processing
 
@@ -353,6 +359,3 @@ The API is responsible for initiating, coordinating, executing, and tracking the
 The design must prioritize responsible access to external providers, data provenance, correctness, idempotency, efficient bulk persistence, and compatibility with the existing Clean Architecture.
 
 Do not optimize for unnecessary abstraction. Implement the simplest architecture that correctly supports large historical datasets and future expansion.
-
-
-

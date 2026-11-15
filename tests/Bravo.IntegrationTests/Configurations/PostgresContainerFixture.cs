@@ -7,21 +7,31 @@ namespace Bravo.IntegrationTests.Configurations;
 
 public sealed class PostgresContainerFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
-        .Build();
+    private readonly string? _externalConnectionString =
+        Environment.GetEnvironmentVariable("BRAVO_TEST_POSTGRES_CONNECTION");
+
+    private PostgreSqlContainer? _container;
 
     public ApiFactory Factory { get; private set; } = default!;
 
-    public string ConnectionString => _container.GetConnectionString();
+    public string ConnectionString => _externalConnectionString ?? _container!.GetConnectionString();
 
     public async Task DisposeAsync()
     {
-        await _container.DisposeAsync();
+        if (_container is not null)
+        {
+            await _container.DisposeAsync();
+        }
     }
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
+        if (_externalConnectionString is null)
+        {
+            _container = new PostgreSqlBuilder("postgres:16-alpine").Build();
+            await _container.StartAsync();
+        }
+
         Factory = new ApiFactory(this);
         await RunMigrationsAsync();
     }

@@ -19,6 +19,7 @@ Respect the following responsibilities:
 The Domain layer contains the core business model and rules.
 
 It should contain:
+
 - Entities and aggregate roots.
 - Value objects.
 - Domain enums.
@@ -27,6 +28,7 @@ It should contain:
 - Domain events, if applicable.
 
 It must NOT depend on:
+
 - Entity Framework Core.
 - Dapper.
 - Npgsql.
@@ -42,6 +44,7 @@ The Domain must remain independent of persistence technologies.
 The Application layer coordinates use cases and defines application contracts.
 
 It may contain:
+
 - Commands and Queries.
 - Handlers.
 - Application services.
@@ -60,6 +63,7 @@ Do not expose DbContext, IDbConnection, NpgsqlConnection, or EF Core-specific ty
 The Infrastructure layer implements technical details and external dependencies.
 
 It should contain:
+
 - EF Core DbContext and entity configurations.
 - Repository implementations.
 - Dapper query implementations.
@@ -79,6 +83,7 @@ It must not contain business rules that belong to Domain.
 The Presentation layer exposes the application to external consumers.
 
 It may contain:
+
 - API endpoints.
 - Controllers.
 - HTTP configuration.
@@ -110,6 +115,7 @@ Use them according to their intended responsibilities:
 ### Entity Framework Core
 
 Use EF Core for:
+
 - Domain-oriented persistence.
 - Aggregate persistence.
 - Entity relationships.
@@ -123,6 +129,7 @@ EF Core configurations and DbContext implementations belong in Infrastructure.
 ### Dapper
 
 Use Dapper for:
+
 - Analytical queries.
 - Historical comparisons.
 - Aggregations.
@@ -159,6 +166,27 @@ Keep write and read responsibilities clearly separated when this improves mainta
 
 Avoid generic repositories that expose unnecessary CRUD operations for every entity.
 
+Do not use try catches. They add no handling in the code at all and hides errors.
+
+Use clean code, KISS, DRY, SOLID as source of truths. They should be part of your coding guidelines on
+how code should looks like.
+
+Only one class inside each file. It keeps code traceable and findable.
+
+Using clean architecture, orchestration must be always made at Application.
+
+Domain Services should be interfaces set in domain and implemented at Infrastructure.
+
+Each infrastructure project must have one reason to change.
+If you need to make requests to two differente API`s of different contexts,
+create another Infrastructure project and make the requests.
+
+Prefer design patterns over tradicional if/else/switch cases.
+you can find them all here:
+https://refactoring.guru/design-patterns
+
+Classes should be small and concise. They must have maximum one reason to change.
+
 ## 6. Dependency Injection
 
 Follow the existing dependency injection conventions.
@@ -169,6 +197,8 @@ Application must not instantiate Infrastructure implementations directly.
 
 Do not introduce service locators or manually instantiate database implementations inside handlers or domain entities.
 
+When using DI, prefer primary constructor instead creating properties and large constructors
+
 ## 7. Implementation Rules
 
 Before modifying code:
@@ -178,7 +208,7 @@ Before modifying code:
 3. Locate existing EF Core and Dapper implementations.
 4. Understand repository and query conventions.
 5. Identify the dependency injection registration points.
-6. Follow existing naming and coding conventions.
+6. Follow existing naming and coding conventions, avoiding generic names and nomeclature.
 
 When implementing new functionality:
 
@@ -190,6 +220,7 @@ When implementing new functionality:
 - Avoid unnecessary abstractions and duplicated code.
 - Preserve existing functionality.
 - Do not move files or restructure projects without a concrete reason.
+- Do not leave comments on your code
 
 ## 8. Final Validation
 
@@ -203,6 +234,12 @@ After implementation:
 - Run the solution build and relevant tests.
 
 Report any architectural violations found and explain any necessary corrections.
+
+## 9. Don`t create tests for everything you need.
+
+Testing externals libraries and APIs, such as Entity Framework and IBGE APIs is useless.
+Libraries are almost always working fine and the APIs usually dont change often, and when they do, they will have versioning.
+Test Domain logic instead.
 
 ## Final Principle
 

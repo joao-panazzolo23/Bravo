@@ -18,7 +18,7 @@ public class IntegrationTestBase : IAsyncLifetime
         Db = new NpgsqlConnection(pg.ConnectionString);
     }
 
-    public async Task InitializeAsync()
+    public virtual async Task InitializeAsync()
     {
         await Db.OpenAsync();
 

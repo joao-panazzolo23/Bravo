@@ -22,8 +22,6 @@
     <ProjectReference Include="..\..\Application\Bravo.Application\Bravo.Application.csproj" />
     <ProjectReference Include="..\..\Domain\Bravo.Domain\Bravo.Domain.csproj" />
     <ProjectReference Include="..\..\Domain\Bravo.Shared\Bravo.Shared.csproj" />
-    <ProjectReference Include="..\Bravo.Infrastructure.PostgreSQL.Dapper\Bravo.Infrastructure.PostgreSQL.Dapper.csproj" />
-    <ProjectReference Include="..\Bravo.Infrastructure.PostgreSQL\Bravo.Infrastructure.PostgreSQL.csproj" />
   </ItemGroup>
 
 </Project>

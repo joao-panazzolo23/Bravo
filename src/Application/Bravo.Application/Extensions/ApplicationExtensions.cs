@@ -1,5 +1,5 @@
-using Bravo.Application.Acquisition.Handlers;
 using Bravo.Application.Behaviors;
+using Bravo.Application.Importing.Services;
 using Bravo.Shared.Notifications;
 using FluentValidation;
 using Mediator;
@@ -14,7 +14,7 @@ public static class ApplicationExtensions
         return services.AddMediatorPattern()
                        .AddPipelineBehaviors()
                        .AddValidators()
-                       .AddScoped<IbgeImportHandler>();
+                      .AddApplicationServices();
     }
 
     public static IServiceCollection AddMediatorPattern(this IServiceCollection services)
@@ -31,5 +31,11 @@ public static class ApplicationExtensions
     {
         return services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>))
                     .AddScoped<INotificationContext, NotificationContext>();
+    }
+
+    public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+    {
+        return services.AddScoped<ImportJobExecutor>()
+                       .AddScoped<ImportRetryPolicy>();
     }
 }

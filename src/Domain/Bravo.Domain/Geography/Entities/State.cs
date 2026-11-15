@@ -11,15 +11,22 @@ public class State : Entity
 
     private State() { }
 
+    private State(
+        int ibgeCode,
+        string abbreviation,
+        string name,
+        string region
+    )
+    {
+        IbgeCode = ibgeCode;
+        Abbreviation = abbreviation;
+        Name = name;
+        Region = region;
+    }
+
     public static State Create(int ibgeCode, string abbreviation, string name, string region)
     {
-        var state = new State
-        {
-            IbgeCode = ibgeCode,
-            Abbreviation = abbreviation,
-            Name = name,
-            Region = region
-        };
+        var state = new State(ibgeCode, abbreviation, name, region);
         state.SetCreatedAt(DateTime.UtcNow);
         state.SetUpdatedAt(DateTime.UtcNow);
         return state;

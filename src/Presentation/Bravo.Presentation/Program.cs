@@ -10,11 +10,13 @@ builder.Services.AddDatabase(builder.Configuration)
                 .AddControllerConfiguration()
                 .AddDocumentation(builder.Environment)
                 .AddApplication()
+                .AddImportWorker(builder.Configuration)
                 .AddExceptions();
 
 var app = builder.Build();
 
 app.UseExceptionHandler()
+    .UseDatabase()
    .UseSecurity()
    .UseDocumentation()
    .UseApplication()

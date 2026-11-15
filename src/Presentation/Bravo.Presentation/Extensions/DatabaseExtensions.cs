@@ -14,8 +14,6 @@ public static class DatabaseExtensions
         IConfiguration configuration
         )
     {
-        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-
         return services.AddPostgreSQLDapper()
                        .AddPostgreSQL(configuration)
                        .AddAcquisition(configuration);
