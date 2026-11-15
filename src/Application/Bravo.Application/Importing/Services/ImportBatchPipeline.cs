@@ -7,13 +7,13 @@ using Microsoft.Extensions.Logging;
 namespace Bravo.Application.Importing.Services;
 
 public sealed class ImportBatchPipeline<TRecord>(
-    string importType,
+    string unitKey,
     IImportSource<TRecord> source,
     IImportRecordValidator<TRecord> validator,
     IImportBatchStore<TRecord> store,
     ILogger<ImportBatchPipeline<TRecord>> logger) : IImportPipeline
 {
-    public string ImportType { get; } = importType;
+    public string UnitKey { get; } = unitKey;
 
     public async Task ProcessAsync(
         ImportJob job,
@@ -27,7 +27,7 @@ public sealed class ImportBatchPipeline<TRecord>(
             var batch = await source.ReadBatchAsync(cursor, job.BatchSize, cancellationToken);
 
             if (batch.HasMore && string.Equals(batch.NextCursor, cursor, StringComparison.Ordinal))
-                throw new ImportPermanentException($"The import source for '{ImportType}' did not advance its cursor.");
+                throw new ImportPermanentException($"The import source for '{UnitKey}' did not advance its cursor.");
 
             var validation = Validate(batch, cursor);
             var context = new ImportBatchWriteContext(
@@ -37,7 +37,6 @@ public sealed class ImportBatchPipeline<TRecord>(
                 workUnit.LeaseOwner ?? throw new ImportLeaseLostException("The work unit has no active lease owner."),
                 batch.NextCursor,
                 !batch.HasMore,
-                job.ConflictStrategy,
                 job.LeaseDurationSeconds);
 
             var startedAt = DateTime.UtcNow;

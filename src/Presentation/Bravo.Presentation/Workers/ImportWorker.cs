@@ -78,7 +78,8 @@ public sealed class ImportWorker(
                     _running.TryRemove(jobId, out _);
                     _slots.Release();
                 },
-                TaskScheduler.Default);
+                TaskScheduler.Default
+                );
         }
     }
 

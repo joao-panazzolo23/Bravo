@@ -4,7 +4,7 @@ namespace Bravo.Application.Importing.Contracts;
 
 public interface IImportPipeline
 {
-    string ImportType { get; }
+    string UnitKey { get; }
 
     Task ProcessAsync(
         ImportJob job,

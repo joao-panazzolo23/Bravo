@@ -11,35 +11,31 @@ namespace Bravo.Presentation.Controllers;
 
 [ApiController]
 [Route("api/v1/import")]
+[AllowAnonymous]
 public class ImportController(IMediator mediator) : ControllerBase
 {
-    [HttpPost]
-    [Authorize(Roles = AuthorizationRoles.Administrators)]
-    public async Task<ActionResult<Result<ImportJobCreatedViewModel>>> Create(
-        [FromBody] CreateImportJobCommand command)
+    [HttpPost("ibge")]
+    // [Authorize(Roles = AuthorizationRoles.Administrators)]
+    public async Task<ActionResult<Result<ImportJobCreatedViewModel>>> StartIbge(
+        [FromBody] StartIbgeImportCommand command
+    )
     {
         var response = await mediator.Send(command);
         return StatusCode(response.StatusCode, response);
     }
 
-    [HttpGet("types")]
-    [Authorize(Roles = AuthorizationRoles.Administrators)]
-    public async Task<ActionResult<Result<IReadOnlyList<string>>>> ListTypes()
-    {
-        var response = await mediator.Send(new ListImportTypesQuery());
-        return StatusCode(response.StatusCode, response);
-    }
-
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = AuthorizationRoles.Administrators)]
-    public async Task<ActionResult<Result<ImportJobStatusViewModel?>>> GetStatus([FromRoute] Guid id)
+    // [Authorize(Roles = AuthorizationRoles.Administrators)]
+    public async Task<ActionResult<Result<ImportJobStatusViewModel?>>> GetStatus(
+        [FromRoute] Guid id
+    )
     {
         var response = await mediator.Send(new GetImportJobStatusQuery(id));
         return StatusCode(response.StatusCode, response);
     }
 
     [HttpGet("{id:guid}/failures")]
-    [Authorize(Roles = AuthorizationRoles.Administrators)]
+    // [Authorize(Roles = AuthorizationRoles.Administrators)]
     public async Task<ActionResult<Result<IReadOnlyList<ImportFailedRecordViewModel>>>> GetFailures(
         [FromRoute] Guid id,
         [FromQuery] int limit = 100)
@@ -49,7 +45,7 @@ public class ImportController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("{id:guid}/retry")]
-    [Authorize(Roles = AuthorizationRoles.Administrators)]
+    // [Authorize(Roles = AuthorizationRoles.Administrators)]
     public async Task<ActionResult<Result<ImportJobCreatedViewModel>>> Retry([FromRoute] Guid id)
     {
         var response = await mediator.Send(new RetryImportJobCommand(id));
@@ -57,8 +53,8 @@ public class ImportController(IMediator mediator) : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = AuthorizationRoles.Administrators)]
-    public async Task<ActionResult<Result<Unit>>> Cancel([FromRoute] Guid id)
+    // [Authorize(Roles = AuthorizationRoles.Administrators)]
+    public async Task<IActionResult> Cancel([FromRoute] Guid id)
     {
         var response = await mediator.Send(new CancelImportJobCommand(id));
         return StatusCode(response.StatusCode, response);

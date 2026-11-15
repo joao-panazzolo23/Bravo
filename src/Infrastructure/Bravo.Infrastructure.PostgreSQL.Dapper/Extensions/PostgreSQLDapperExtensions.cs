@@ -1,3 +1,4 @@
+using Bravo.Application.Acquisition.Providers;
 using Bravo.Application.Importing.Contracts;
 using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Users.Repositories;
@@ -32,7 +33,8 @@ public static class PostgreSQLDapperExtensions
         return services.AddScoped<IImportJobRepository, ImportJobRepository>()
                        .AddScoped<IImportWorkUnitRepository, ImportWorkUnitRepository>()
                        .AddScoped<IImportFailedRecordRepository, ImportFailedRecordRepository>()
-                       .AddScoped<IImportBatchStore<State>, StateImportBatchStore>();
+                       .AddScoped<IImportBatchStore<State>, StateImportBatchStore>()
+                       .AddScoped<IImportBatchStore<IbgeMunicipalityRecord>, MunicipalityImportBatchStore>();
     }
 
     private static IServiceCollection AddDataSource(this IServiceCollection services)

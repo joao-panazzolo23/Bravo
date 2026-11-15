@@ -12,7 +12,9 @@ namespace Bravo.Presentation.Controllers;
 
 [ApiController]
 [Route("api/v1/user")]
-public class UserController(IMediator _mediator) : ControllerBase
+public class UserController(
+    IMediator _mediator
+) : ControllerBase
 {
 
     [HttpGet("me")]

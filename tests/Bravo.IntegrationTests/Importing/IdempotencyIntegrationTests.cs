@@ -25,7 +25,7 @@ public sealed class IdempotencyIntegrationTests(PostgresContainerFixture pg) : I
     }
 
     [Fact]
-    public async Task DoNothingConflictStrategyPreservesExistingRecord()
+    public async Task ReimportingUpdatesExistingRecords()
     {
         Source.Add(CreateState(61, name: "Original"));
         var firstJob = await CreateJobAsync(batchSize: 1);
@@ -33,42 +33,10 @@ public sealed class IdempotencyIntegrationTests(PostgresContainerFixture pg) : I
 
         Source.Reset();
         Source.Add(CreateState(61, name: "Replacement"));
-        var secondJob = await CreateJobAsync(batchSize: 1, conflictStrategy: ImportConflictStrategy.DoNothing);
+        var secondJob = await CreateJobAsync(batchSize: 1);
         await RunJobAsync(secondJob.Id);
 
-        (await GetStateNameAsync(61)).Should().Be("Original");
-    }
-
-    [Fact]
-    public async Task UpdateConflictStrategyReplacesExistingRecord()
-    {
-        Source.Add(CreateState(71, name: "Original"));
-        var firstJob = await CreateJobAsync(batchSize: 1);
-        await RunJobAsync(firstJob.Id);
-
-        Source.Reset();
-        Source.Add(CreateState(71, name: "Replacement"));
-        var secondJob = await CreateJobAsync(batchSize: 1, conflictStrategy: ImportConflictStrategy.Update);
-        await RunJobAsync(secondJob.Id);
-
-        (await GetStateNameAsync(71)).Should().Be("Replacement");
-    }
-
-    [Fact]
-    public async Task FailConflictStrategyStopsOnDuplicate()
-    {
-        Source.Add(CreateState(81));
-        var firstJob = await CreateJobAsync(batchSize: 1);
-        await RunJobAsync(firstJob.Id);
-
-        Source.Reset();
-        Source.Add(CreateState(81));
-        var secondJob = await CreateJobAsync(batchSize: 1, conflictStrategy: ImportConflictStrategy.Fail);
-        await RunJobAsync(secondJob.Id);
-
-        var failedJob = await GetJobAsync(secondJob.Id);
-
-        failedJob!.Status.Should().Be(ImportJobStatus.Failed);
+        (await GetStateNameAsync(61)).Should().Be("Replacement");
         (await CountStatesAsync()).Should().Be(1);
     }
 

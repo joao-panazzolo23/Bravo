@@ -2,9 +2,7 @@ namespace Bravo.Application.Importing.ViewModels;
 
 public sealed record ImportJobStatusViewModel(
     Guid Id,
-    string ImportType,
     string Status,
-    string ConflictStrategy,
     int BatchSize,
     int MaxAttempts,
     int LeaseDurationSeconds,

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Bravo.Domain.Geography.Entities;
-using Bravo.Domain.Importing.Enums;
 using Dapper;
 using Npgsql;
 
@@ -9,7 +8,7 @@ namespace Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Importing;
 internal sealed class StateImportBatchStore(NpgsqlDataSource dataSource)
     : DapperImportBatchStore<State>(dataSource)
 {
-    private const string InsertSql = """
+    private const string UpsertSql = """
         INSERT INTO "States"
             ("Id", "IbgeCode", "Abbreviation", "Name", "Region", "CreatedAt", "UpdatedAt")
         SELECT
@@ -23,13 +22,6 @@ internal sealed class StateImportBatchStore(NpgsqlDataSource dataSource)
             "Region" varchar(20),
             "CreatedAt" timestamp with time zone,
             "UpdatedAt" timestamp with time zone)
-        """;
-
-    private const string DoNothingSql = InsertSql + """
-        ON CONFLICT ("IbgeCode") DO NOTHING;
-        """;
-
-    private const string UpdateSql = InsertSql + """
         ON CONFLICT ("IbgeCode") DO UPDATE SET
             "Abbreviation" = EXCLUDED."Abbreviation",
             "Name" = EXCLUDED."Name",
@@ -37,13 +29,10 @@ internal sealed class StateImportBatchStore(NpgsqlDataSource dataSource)
             "UpdatedAt" = EXCLUDED."UpdatedAt";
         """;
 
-    private const string FailSql = InsertSql + ";";
-
     protected override async Task PersistRecordsAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         IReadOnlyList<State> records,
-        ImportConflictStrategy conflictStrategy,
         CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.Serialize(records.Select(state => new
@@ -57,16 +46,8 @@ internal sealed class StateImportBatchStore(NpgsqlDataSource dataSource)
             state.UpdatedAt
         }));
 
-        var sql = conflictStrategy switch
-        {
-            ImportConflictStrategy.DoNothing => DoNothingSql,
-            ImportConflictStrategy.Update => UpdateSql,
-            ImportConflictStrategy.Fail => FailSql,
-            _ => throw new ArgumentOutOfRangeException(nameof(conflictStrategy))
-        };
-
         await connection.ExecuteAsync(new CommandDefinition(
-            sql,
+            UpsertSql,
             new { Records = payload },
             transaction,
             cancellationToken: cancellationToken));

@@ -27,7 +27,7 @@ public sealed class ApiFactory(PostgresContainerFixture pg) : WebApplicationFact
             services.AddSingleton(StateSource);
             services.AddSingleton(StateValidator);
             services.AddScoped<IImportPipeline>(provider => new ImportBatchPipeline<State>(
-                TestStateSource.ImportType,
+                TestStateSource.UnitKey,
                 provider.GetRequiredService<TestStateSource>(),
                 provider.GetRequiredService<TestStateValidator>(),
                 provider.GetRequiredService<IImportBatchStore<State>>(),

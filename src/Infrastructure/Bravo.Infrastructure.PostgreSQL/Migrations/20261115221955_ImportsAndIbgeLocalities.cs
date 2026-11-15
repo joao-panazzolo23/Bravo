@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Bravo.Infrastructure.PostgreSQL.Migrations
 {
-    
-    public partial class AddAcquisitionAndGeography : Migration
+    /// <inheritdoc />
+    public partial class ImportsAndIbgeLocalities : Migration
     {
-        
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
@@ -32,6 +32,28 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ImportExecutions", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ImportJobs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    BatchSize = table.Column<int>(type: "integer", nullable: false),
+                    MaxAttempts = table.Column<int>(type: "integer", nullable: false),
+                    LeaseDurationSeconds = table.Column<int>(type: "integer", nullable: false),
+                    TotalProcessedRecords = table.Column<long>(type: "bigint", nullable: false),
+                    TotalFailedRecords = table.Column<long>(type: "bigint", nullable: false),
+                    LastError = table.Column<string>(type: "text", nullable: true),
+                    StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ImportJobs", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -142,6 +164,39 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ImportWorkUnits",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UnitKey = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Cursor = table.Column<string>(type: "text", nullable: true),
+                    ProcessedRecords = table.Column<long>(type: "bigint", nullable: false),
+                    FailedRecords = table.Column<long>(type: "bigint", nullable: false),
+                    AttemptCount = table.Column<int>(type: "integer", nullable: false),
+                    NextAttemptAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    LastError = table.Column<string>(type: "text", nullable: true),
+                    LeaseOwner = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    LeaseExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    FencingToken = table.Column<long>(type: "bigint", nullable: false),
+                    StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ImportWorkUnits", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ImportWorkUnits_ImportJobs_JobId",
+                        column: x => x.JobId,
+                        principalTable: "ImportJobs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "RolePermissions",
                 columns: table => new
                 {
@@ -235,6 +290,38 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ImportFailedRecords",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobId = table.Column<Guid>(type: "uuid", nullable: false),
+                    WorkUnitId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SourceIdentifier = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Payload = table.Column<string>(type: "text", nullable: true),
+                    ErrorCategory = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    ErrorDescription = table.Column<string>(type: "text", nullable: false),
+                    AttemptCount = table.Column<int>(type: "integer", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ImportFailedRecords", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ImportFailedRecords_ImportJobs_JobId",
+                        column: x => x.JobId,
+                        principalTable: "ImportJobs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ImportFailedRecords_ImportWorkUnits_WorkUnitId",
+                        column: x => x.WorkUnitId,
+                        principalTable: "ImportWorkUnits",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Permissions",
                 columns: table => new
                 {
@@ -280,6 +367,40 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                 name: "IX_ImportExecutions_Status_CreatedAt",
                 table: "ImportExecutions",
                 columns: new[] { "Status", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ImportFailedRecords_JobId_CreatedAt",
+                table: "ImportFailedRecords",
+                columns: new[] { "JobId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ImportFailedRecords_WorkUnitId_SourceIdentifier",
+                table: "ImportFailedRecords",
+                columns: new[] { "WorkUnitId", "SourceIdentifier" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ImportJobs_Status_CreatedAt",
+                table: "ImportJobs",
+                columns: new[] { "Status", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ImportWorkUnits_JobId_Status_NextAttemptAt_CreatedAt",
+                table: "ImportWorkUnits",
+                columns: new[] { "JobId", "Status", "NextAttemptAt", "CreatedAt" },
+                filter: "\"Status\" IN ('Pending', 'Running')");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ImportWorkUnits_JobId_UnitKey",
+                table: "ImportWorkUnits",
+                columns: new[] { "JobId", "UnitKey" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ImportWorkUnits_LeaseExpiresAt",
+                table: "ImportWorkUnits",
+                column: "LeaseExpiresAt",
+                filter: "\"Status\" = 'Running'");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Municipalities_IbgeCode",
@@ -337,7 +458,7 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                 column: "UserId");
         }
 
-        
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
@@ -345,6 +466,9 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
             migrationBuilder.DropTable(
                 name: "ImportCheckpoints");
+
+            migrationBuilder.DropTable(
+                name: "ImportFailedRecords");
 
             migrationBuilder.DropTable(
                 name: "Municipalities");
@@ -362,6 +486,9 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                 name: "ImportExecutions");
 
             migrationBuilder.DropTable(
+                name: "ImportWorkUnits");
+
+            migrationBuilder.DropTable(
                 name: "States");
 
             migrationBuilder.DropTable(
@@ -369,6 +496,9 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
             migrationBuilder.DropTable(
                 name: "Users");
+
+            migrationBuilder.DropTable(
+                name: "ImportJobs");
 
             migrationBuilder.DropTable(
                 name: "Roles");

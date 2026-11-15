@@ -33,12 +33,9 @@ public abstract class ImportingTestBase(PostgresContainerFixture pg) : Integrati
         string[]? unitKeys = null,
         int batchSize = 2,
         int maxAttempts = 3,
-        int leaseDurationSeconds = 60,
-        ImportConflictStrategy conflictStrategy = ImportConflictStrategy.DoNothing)
+        int leaseDurationSeconds = 60)
     {
         var job = ImportJob.Create(
-            TestStateSource.ImportType,
-            conflictStrategy,
             batchSize,
             maxAttempts,
             leaseDurationSeconds);
@@ -133,8 +130,7 @@ public abstract class ImportingTestBase(PostgresContainerFixture pg) : Integrati
         IReadOnlyList<State> records,
         string? nextCursor,
         bool isFinalBatch,
-        int leaseSeconds = 60,
-        ImportConflictStrategy conflictStrategy = ImportConflictStrategy.DoNothing)
+        int leaseSeconds = 60)
     {
         await using var scope = Pg.Factory.Services.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IImportBatchStore<State>>();
@@ -147,7 +143,6 @@ public abstract class ImportingTestBase(PostgresContainerFixture pg) : Integrati
                 workUnit.LeaseOwner!,
                 nextCursor,
                 isFinalBatch,
-                conflictStrategy,
                 leaseSeconds),
             records,
             []);

@@ -12,13 +12,13 @@ using Microsoft.Extensions.Logging;
 
 namespace Bravo.Infrastructure.Acquisition.Sources;
 
+///This is not good enough
+/// TODO: REFACTOR
 public sealed class IbgeStateSource(
     IHttpClientFactory httpClientFactory,
     IbgeRateLimiter rateLimiter,
     ILogger<IbgeStateSource> logger) : IImportSource<State>
 {
-    public const string ImportType = "IbgeStates";
-
     private const string RequestUri = "api/v1/localidades/estados?orderBy=nome";
 
     private static readonly JsonSerializerOptions JsonOptions = new()

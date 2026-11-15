@@ -10,8 +10,7 @@ namespace Bravo.Application.Importing.Handlers;
 
 public sealed class RetryImportJobHandler(
     IImportJobRepository jobs,
-    IImportWorkUnitRepository workUnits,
-    IEnumerable<IImportPipeline> pipelines)
+    IImportWorkUnitRepository workUnits)
     : ICommandHandler<RetryImportJobCommand, Result<ImportJobCreatedViewModel>>
 {
     public async ValueTask<Result<ImportJobCreatedViewModel>> Handle(
@@ -26,20 +25,12 @@ public sealed class RetryImportJobHandler(
         if (original.Status != ImportJobStatus.Failed)
             return Result<ImportJobCreatedViewModel>.BadRequest(message: "Only failed import jobs can be retried.");
 
-        if (!pipelines.Any(pipeline => pipeline.ImportType == original.ImportType))
-        {
-            return Result<ImportJobCreatedViewModel>.BadRequest(
-                message: $"No import pipeline is registered for import type '{original.ImportType}'.");
-        }
-
         var failedKeys = await workUnits.GetFailedKeysAsync(command.JobId, cancellationToken);
 
         if (failedKeys.Count == 0)
             return Result<ImportJobCreatedViewModel>.BadRequest(message: "Import job has no failed work units.");
 
         var job = ImportJob.Create(
-            original.ImportType,
-            original.ConflictStrategy,
             original.BatchSize,
             original.MaxAttempts,
             original.LeaseDurationSeconds);
@@ -55,6 +46,6 @@ public sealed class RetryImportJobHandler(
         }
 
         return Result<ImportJobCreatedViewModel>.Created(
-            new ImportJobCreatedViewModel(job.Id, job.ImportType, job.Status.ToString(), failedKeys));
+            new ImportJobCreatedViewModel(job.Id, job.Status.ToString(), failedKeys));
     }
 }

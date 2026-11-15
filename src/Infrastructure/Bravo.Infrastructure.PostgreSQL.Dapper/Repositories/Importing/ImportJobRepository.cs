@@ -9,11 +9,11 @@ internal sealed class ImportJobRepository(NpgsqlDataSource dataSource) : IImport
 {
     private const string InsertJobSql = """
         INSERT INTO "ImportJobs"
-            ("Id", "ImportType", "Status", "ConflictStrategy", "BatchSize", "MaxAttempts",
+            ("Id", "Status", "BatchSize", "MaxAttempts",
              "LeaseDurationSeconds", "TotalProcessedRecords", "TotalFailedRecords", "LastError",
              "CreatedAt", "StartedAt", "CompletedAt", "UpdatedAt")
         VALUES
-            (@Id, @ImportType, @Status, @ConflictStrategy, @BatchSize, @MaxAttempts,
+            (@Id, @Status, @BatchSize, @MaxAttempts,
              @LeaseDurationSeconds, @TotalProcessedRecords, @TotalFailedRecords, @LastError,
              @CreatedAt, @StartedAt, @CompletedAt, @UpdatedAt);
         """;
@@ -30,7 +30,7 @@ internal sealed class ImportJobRepository(NpgsqlDataSource dataSource) : IImport
         """;
 
     private const string LockImportScopeSql = """
-        SELECT pg_advisory_xact_lock(hashtext(@ImportType));
+        SELECT pg_advisory_xact_lock(hashtext('ImportJobs'));
         """;
 
     private const string OverlapSql = """
@@ -39,7 +39,6 @@ internal sealed class ImportJobRepository(NpgsqlDataSource dataSource) : IImport
             FROM "ImportWorkUnits" AS unit
             JOIN "ImportJobs" AS job ON job."Id" = unit."JobId"
             WHERE job."Status" IN ('Pending', 'Running')
-              AND job."ImportType" = @ImportType
               AND unit."UnitKey" = ANY(@UnitKeys)
         );
         """;
@@ -140,13 +139,12 @@ internal sealed class ImportJobRepository(NpgsqlDataSource dataSource) : IImport
 
         await connection.ExecuteAsync(new CommandDefinition(
             LockImportScopeSql,
-            new { job.ImportType },
-            transaction,
+            transaction: transaction,
             cancellationToken: cancellationToken));
 
         var overlaps = await connection.QuerySingleAsync<bool>(new CommandDefinition(
             OverlapSql,
-            new { job.ImportType, UnitKeys = workUnits.Select(unit => unit.UnitKey).ToArray() },
+            new { UnitKeys = workUnits.Select(unit => unit.UnitKey).ToArray() },
             transaction,
             cancellationToken: cancellationToken));
 
@@ -161,9 +159,7 @@ internal sealed class ImportJobRepository(NpgsqlDataSource dataSource) : IImport
             new
             {
                 job.Id,
-                job.ImportType,
                 Status = job.Status.ToString(),
-                ConflictStrategy = job.ConflictStrategy.ToString(),
                 job.BatchSize,
                 job.MaxAttempts,
                 job.LeaseDurationSeconds,
@@ -222,7 +218,8 @@ internal sealed class ImportJobRepository(NpgsqlDataSource dataSource) : IImport
 
     public async Task<IReadOnlyList<Guid>> ListRecoverableIdsAsync(
         int limit,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
@@ -274,6 +271,7 @@ internal sealed class ImportJobRepository(NpgsqlDataSource dataSource) : IImport
             cancellationToken: cancellationToken));
 
         await transaction.CommitAsync(cancellationToken);
+
         return cancelledJob > 0;
     }
 

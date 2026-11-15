@@ -128,6 +128,59 @@ Development will follow an incremental approach.
 
 ---
 
+## 🧑‍💻 Running Locally
+
+**Requirements:** [.NET 10 SDK](https://dotnet.microsoft.com/download) and PostgreSQL 16+.
+
+Integration tests use [Testcontainers](https://dotnet.testcontainers.org/) and therefore require a running Docker daemon. If you have Docker unavailable but a PostgreSQL instance at hand, set `BRAVO_TEST_POSTGRES_CONNECTION` to its connection string and the tests will use it instead of starting a container.
+
+### Populating the API (import engine)
+
+Each data source has its own endpoint. `POST /api/v1/import/ibge` imports the IBGE geographic reference data; other sources get their own routes as they are added. The request only selects tuning knobs — never the data source.
+
+All import endpoints require the `Master` or `Admin` role, so authenticate first:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:5150/api/v1/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@bravo.local","password":"Bravo@2026!"}' \
+  | jq -r '.data.token')
+```
+
+Start an IBGE import. The body is optional:
+
+```bash
+JOB_ID=$(curl -s -X POST http://localhost:5150/api/v1/import/ibge \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"batchSize": 1000, "maxAttempts": 5, "leaseDurationSeconds": 120}' \
+  | jq -r '.data.id')
+```
+
+The job runs its stages in order — states first, then municipalities, which reference the states:
+
+```bash
+curl -s "http://localhost:5150/api/v1/import/$JOB_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq -r '.data.workUnits[] | "\(.unitKey): \(.status) \(.processedRecords)"'
+# IbgeStates: Completed 27
+# IbgeMunicipalities: Completed 5571
+```
+
+Behaviour worth knowing:
+
+- **Statuses:** `Pending` → `Running` → `Completed` | `CompletedWithErrors` | `Failed` | `Cancelled`. A job that rejected individual records ends as `CompletedWithErrors`, never a plain `Completed`.
+- **Stages are sequential.** A work unit is only claimed once every earlier unit in the same job has completed, so dependent stages never run out of order.
+- **Overlapping scopes are rejected.** Starting an import while the same stage is still `Pending`/`Running` returns `409 Conflict`.
+- **Re-running is safe.** Persistence is an UPSERT, so repeating an import updates instead of duplicating.
+- **Failures are inspected, not retried blindly.** `GET /api/v1/import/{id}/failures` lists rejected records; `POST /api/v1/import/{id}/retry` creates a new job from the `Failed` work units only.
+- **Cancellation** is `DELETE /api/v1/import/{id}`; an in-flight batch cannot commit after cancellation.
+- **Recovery is automatic.** If the process dies mid-import, the expired lease lets the worker reclaim the unit and resume from the last committed cursor.
+
+Set `Importing:Worker:Enabled=false` to enqueue jobs without processing them (the integration tests do this).
+
+---
+
 ## 📌 Project Philosophy
 
 BRAVO is built around the idea that publicly available data can be used to produce transparent, reproducible, and statistically grounded analyses.
@@ -145,6 +198,3 @@ Its purpose is analytical, scientific, and educational.
 ## 📄 License
 
 BRAVO is an open-source project. Licensing information will be added once the repository license has been defined.
-
-
-

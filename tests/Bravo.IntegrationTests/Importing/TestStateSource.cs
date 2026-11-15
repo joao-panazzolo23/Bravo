@@ -7,7 +7,7 @@ namespace Bravo.IntegrationTests.Importing;
 
 public sealed class TestStateSource : IImportSource<State>
 {
-    public const string ImportType = "TestStates";
+    public const string UnitKey = "default";
 
     private readonly List<State> _records = [];
     private readonly List<ImportRejectedRecord> _rejected = [];

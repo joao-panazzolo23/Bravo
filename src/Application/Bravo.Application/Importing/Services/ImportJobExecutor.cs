@@ -20,17 +20,6 @@ public sealed class ImportJobExecutor(
         if (job is null || job.IsTerminal)
             return;
 
-        var pipeline = pipelines.SingleOrDefault(candidate => candidate.ImportType == job.ImportType);
-
-        if (pipeline is null)
-        {
-            await jobs.FailAsync(
-                jobId,
-                $"No import pipeline is registered for import type '{job.ImportType}'.",
-                cancellationToken);
-            return;
-        }
-
         if (!await jobs.MarkRunningAsync(jobId, cancellationToken))
             return;
 
@@ -42,6 +31,19 @@ public sealed class ImportJobExecutor(
 
             if (workUnit is null)
                 return;
+
+            var pipeline = pipelines.SingleOrDefault(candidate => candidate.UnitKey == workUnit.UnitKey);
+
+            if (pipeline is null)
+            {
+                await workUnits.FailAsync(
+                    jobId,
+                    workUnit.Id,
+                    workUnit.FencingToken,
+                    $"No import pipeline is registered for work unit '{workUnit.UnitKey}'.",
+                    cancellationToken);
+                continue;
+            }
 
             await ProcessWorkUnitAsync(job, workUnit, pipeline, workerId, leaseDuration, cancellationToken);
 

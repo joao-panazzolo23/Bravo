@@ -92,7 +92,7 @@ public abstract class DapperImportBatchStore<TRecord>(NpgsqlDataSource dataSourc
         }
 
         if (records.Count > 0)
-            await PersistRecordsAsync(connection, transaction, records, context.ConflictStrategy, cancellationToken);
+            await PersistRecordsAsync(connection, transaction, records, cancellationToken);
 
         if (rejectedRecords.Count > 0)
             await PersistRejectedRecordsAsync(connection, transaction, context, rejectedRecords, cancellationToken);
@@ -124,7 +124,6 @@ public abstract class DapperImportBatchStore<TRecord>(NpgsqlDataSource dataSourc
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         IReadOnlyList<TRecord> records,
-        ImportConflictStrategy conflictStrategy,
         CancellationToken cancellationToken);
 
     private static async Task PersistRejectedRecordsAsync(

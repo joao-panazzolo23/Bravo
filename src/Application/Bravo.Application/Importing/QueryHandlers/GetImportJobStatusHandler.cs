@@ -24,9 +24,7 @@ public sealed class GetImportJobStatusHandler(
 
         var viewModel = new ImportJobStatusViewModel(
             job.Id,
-            job.ImportType,
             job.Status.ToString(),
-            job.ConflictStrategy.ToString(),
             job.BatchSize,
             job.MaxAttempts,
             job.LeaseDurationSeconds,

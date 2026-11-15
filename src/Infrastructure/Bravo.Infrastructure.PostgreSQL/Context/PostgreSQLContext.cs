@@ -1,6 +1,8 @@
 using Bravo.Domain.Acquisition.Entities;
 using Bravo.Domain.Auth.Entities;
 using Bravo.Domain.Geography.Entities;
+using Bravo.Domain.Importing.Entities;
+using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Users.Entities;
 using Bravo.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +18,9 @@ public class PostgreSQLContext(DbContextOptions<PostgreSQLContext> options) : Db
     public DbSet<Permission> Permissions { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<RolePermission> RolePermissions { get; set; }
+    public DbSet<ImportJob> ImportJobs { get; set; }
+    public DbSet<ImportWorkUnit> ImportWorkUnits { get; set; }
+    public DbSet<ImportFailedRecord> ImportFailedRecords { get; set; }
     public DbSet<State> States { get; set; }
     public DbSet<Municipality> Municipalities { get; set; }
     public DbSet<ImportExecution> ImportExecutions { get; set; }

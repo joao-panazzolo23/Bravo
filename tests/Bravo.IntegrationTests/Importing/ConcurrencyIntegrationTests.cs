@@ -136,19 +136,34 @@ public sealed class ConcurrencyIntegrationTests(PostgresContainerFixture pg) : I
     [Fact]
     public async Task OverlappingScopeCannotStartTwice()
     {
-        var first = CreateOverlapJob("Overlap");
+        var first = CreateOverlapJob();
         (await TryCreateJobAsync(first, "states")).Should().BeTrue();
 
-        var duplicate = CreateOverlapJob("Overlap");
+        var duplicate = CreateOverlapJob();
         (await TryCreateJobAsync(duplicate, "states")).Should().BeFalse();
 
-        var otherScope = CreateOverlapJob("Overlap");
+        var otherScope = CreateOverlapJob();
         (await TryCreateJobAsync(otherScope, "municipalities")).Should().BeTrue();
-
-        var otherType = CreateOverlapJob("Distinct");
-        (await TryCreateJobAsync(otherType, "states")).Should().BeTrue();
     }
 
-    private static ImportJob CreateOverlapJob(string importType)
-        => ImportJob.Create(importType, ImportConflictStrategy.DoNothing, 10, 3, 60);
+    [Fact]
+    public async Task LaterWorkUnitIsNotClaimedBeforeEarlierOneCompletes()
+    {
+        var job = await CreateJobAsync(unitKeys: ["first", "second"]);
+        await MarkJobRunningAsync(job.Id);
+
+        var first = await ClaimNextAsync(job.Id, "worker-a");
+        first!.UnitKey.Should().Be("first");
+
+        (await ClaimNextAsync(job.Id, "worker-b")).Should().BeNull();
+
+        await ApplyBatchAsync(first, [], nextCursor: null, isFinalBatch: true);
+
+        var second = await ClaimNextAsync(job.Id, "worker-b");
+        second.Should().NotBeNull();
+        second!.UnitKey.Should().Be("second");
+    }
+
+    private static ImportJob CreateOverlapJob()
+        => ImportJob.Create(10, 3, 60);
 }

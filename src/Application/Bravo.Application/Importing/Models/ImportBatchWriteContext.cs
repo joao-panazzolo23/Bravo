@@ -1,5 +1,3 @@
-using Bravo.Domain.Importing.Enums;
-
 namespace Bravo.Application.Importing.Models;
 
 public sealed record ImportBatchWriteContext(
@@ -9,5 +7,5 @@ public sealed record ImportBatchWriteContext(
     string WorkerId,
     string? NextCursor,
     bool IsFinalBatch,
-    ImportConflictStrategy ConflictStrategy,
-    int LeaseDurationSeconds);
+    int LeaseDurationSeconds
+);

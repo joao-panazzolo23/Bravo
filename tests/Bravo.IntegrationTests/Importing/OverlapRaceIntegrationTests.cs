@@ -12,7 +12,7 @@ public sealed class OverlapRaceIntegrationTests(PostgresContainerFixture pg) : I
     public async Task ConcurrentCreatesForTheSameScopeAllowOnlyOneWinner()
     {
         var attempts = Enumerable.Range(0, 8)
-            .Select(_ => CreateOverlapJob("RaceOverlap"))
+            .Select(_ => CreateOverlapJob())
             .ToArray();
 
         var results = await Task.WhenAll(attempts.Select(job => TryCreateJobAsync(job, "states")));
@@ -20,6 +20,6 @@ public sealed class OverlapRaceIntegrationTests(PostgresContainerFixture pg) : I
         results.Count(created => created).Should().Be(1);
     }
 
-    private static ImportJob CreateOverlapJob(string importType)
-        => ImportJob.Create(importType, ImportConflictStrategy.DoNothing, 10, 3, 60);
+    private static ImportJob CreateOverlapJob()
+        => ImportJob.Create(10, 3, 60);
 }

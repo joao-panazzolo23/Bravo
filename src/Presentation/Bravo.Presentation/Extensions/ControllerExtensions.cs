@@ -1,4 +1,6 @@
-﻿namespace Bravo.Presentation.Extensions;
+﻿using System.Text.Json.Serialization;
+
+namespace Bravo.Presentation.Extensions;
 
 public static class ControllerExtensions
 {
@@ -6,11 +8,12 @@ public static class ControllerExtensions
     {
         services.AddEndpointsApiExplorer()
                 .AddDistributedMemoryCache()
-                .AddControllers(O =>
+                .AddControllers(options =>
                 {
-                    //when client sends an unsupported format type, returns 406 -> we just accept json
-                    O.ReturnHttpNotAcceptable = true;
-                });
+                    options.ReturnHttpNotAcceptable = true;
+                })
+                .AddJsonOptions(options =>
+                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
         return services;
     }

@@ -1,4 +1,5 @@
-using System.Text.Json;
+using Bravo.Application.Acquisition.Providers;
+using Bravo.Application.Importing;
 using Bravo.Application.Importing.Contracts;
 using Bravo.Application.Importing.Services;
 using Bravo.Domain.Geography.Entities;
@@ -34,15 +35,31 @@ public static class AcquisitionExtensions
             client.Timeout = TimeSpan.FromSeconds(settings.HttpTimeoutSeconds);
         });
 
-        services.AddScoped<IImportSource<State>, IbgeStateSource>();
-        services.AddScoped<IImportRecordValidator<State>, StateValidator>();
-        services.AddScoped<IImportPipeline>(provider => new ImportBatchPipeline<State>(
-            IbgeStateSource.ImportType,
-            provider.GetRequiredService<IImportSource<State>>(),
-            provider.GetRequiredService<IImportRecordValidator<State>>(),
-            provider.GetRequiredService<IImportBatchStore<State>>(),
-            provider.GetRequiredService<ILogger<ImportBatchPipeline<State>>>()));
+        return services.AddStatesImport()
+                       .AddMunicipalitiesImport();
+    }
 
-        return services;
+    private static IServiceCollection AddStatesImport(this IServiceCollection services)
+    {
+        return services.AddScoped<IImportSource<State>, IbgeStateSource>()
+                       .AddScoped<IImportRecordValidator<State>, StateValidator>()
+                       .AddScoped<IImportPipeline>(provider => new ImportBatchPipeline<State>(
+                           IbgeImport.StatesUnitKey,
+                           provider.GetRequiredService<IImportSource<State>>(),
+                           provider.GetRequiredService<IImportRecordValidator<State>>(),
+                           provider.GetRequiredService<IImportBatchStore<State>>(),
+                           provider.GetRequiredService<ILogger<ImportBatchPipeline<State>>>()));
+    }
+
+    private static IServiceCollection AddMunicipalitiesImport(this IServiceCollection services)
+    {
+        return services.AddScoped<IImportSource<IbgeMunicipalityRecord>, IbgeMunicipalitySource>()
+                       .AddScoped<IImportRecordValidator<IbgeMunicipalityRecord>, MunicipalityValidator>()
+                       .AddScoped<IImportPipeline>(provider => new ImportBatchPipeline<IbgeMunicipalityRecord>(
+                           IbgeImport.MunicipalitiesUnitKey,
+                           provider.GetRequiredService<IImportSource<IbgeMunicipalityRecord>>(),
+                           provider.GetRequiredService<IImportRecordValidator<IbgeMunicipalityRecord>>(),
+                           provider.GetRequiredService<IImportBatchStore<IbgeMunicipalityRecord>>(),
+                           provider.GetRequiredService<ILogger<ImportBatchPipeline<IbgeMunicipalityRecord>>>()));
     }
 }

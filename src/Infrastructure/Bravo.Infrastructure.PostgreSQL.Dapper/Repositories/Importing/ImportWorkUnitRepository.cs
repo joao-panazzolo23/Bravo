@@ -19,6 +19,13 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
                       AND (unit."NextAttemptAt" IS NULL OR unit."NextAttemptAt" <= now()))
                   OR (unit."Status" = 'Running' AND unit."LeaseExpiresAt" < now())
               )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "ImportWorkUnits" AS previous
+                  WHERE previous."JobId" = unit."JobId"
+                    AND (previous."CreatedAt", previous."Id") < (unit."CreatedAt", unit."Id")
+                    AND previous."Status" <> 'Completed'
+              )
             ORDER BY unit."CreatedAt", unit."Id"
             FOR UPDATE OF unit SKIP LOCKED
             LIMIT 1

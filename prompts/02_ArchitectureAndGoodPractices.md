@@ -199,6 +199,65 @@ Do not introduce service locators or manually instantiate database implementatio
 
 When using DI, prefer primary constructor instead creating properties and large constructors
 
+## Appendix — HttpClient Usage and Dependency Injection
+
+### Core Principle
+
+**Never inject `IHttpClientFactory` directly into application services, API clients, repositories, or other business classes.**
+
+`IHttpClientFactory` must be used exclusively at the dependency composition/registration level to create and configure `HttpClient` instances.
+
+### Mandatory Guidelines
+
+1. **Use Typed or Named HttpClients:** Register HTTP integrations through `AddHttpClient<TClient>()` or named clients when appropriate.
+2. **Constructor Injection:** Inject the configured `HttpClient` directly into the class that needs to perform HTTP requests.
+3. **No Runtime Factory Dependencies:** Classes must not receive `IHttpClientFactory` just to call `CreateClient()` internally.
+4. **Centralized Configuration:** Base addresses, default headers, timeouts, authentication handlers, retry policies, and other HTTP configurations must be defined during DI registration.
+5. **Single Responsibility:** HTTP-consuming classes should focus on their integration responsibilities, not on creating or configuring their own dependencies.
+
+### Expected Implementation
+
+**Correct:**
+
+```csharp
+// Dependency registration
+services.AddHttpClient<ExternalApiClient>(client =>
+{
+    client.BaseAddress = new Uri(configuration["ExternalApi:BaseUrl"]!);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+```
+
+```csharp
+public sealed class ExternalApiClient(HttpClient httpClient)
+{
+    public async Task<string> GetDataAsync(CancellationToken cancellationToken)
+    {
+        return await httpClient.GetStringAsync("data", cancellationToken);
+    }
+}
+```
+
+**Incorrect:**
+
+```csharp
+public sealed class ExternalApiService(IHttpClientFactory httpClientFactory)
+{
+    public async Task<string> GetDataAsync()
+    {
+        var client = httpClientFactory.CreateClient("ExternalApi");
+
+        return await client.GetStringAsync("data");
+    }
+}
+```
+
+### Architectural Rule
+
+The factory belongs to the composition infrastructure, not to the application logic.
+
+**Prefer injecting configured dependencies over injecting mechanisms responsible for constructing those dependencies.**
+
 ## 7. Implementation Rules
 
 Before modifying code:
@@ -240,6 +299,18 @@ Report any architectural violations found and explain any necessary corrections.
 Testing externals libraries and APIs, such as Entity Framework and IBGE APIs is useless.
 Libraries are almost always working fine and the APIs usually dont change often, and when they do, they will have versioning.
 Test Domain logic instead.
+
+## 10. Do not modify or create code FOR Entity Framework Core`s MIGRATIONS.
+
+DO NOT, BY ANY MEANS, CREATE A MIGRATION BY HAND. ONLY IF I TOLD YOU TO IGNORE THAT RULE.
+Entity Framework already tracks down entities and create Migrations for you.
+The only thing you gotta do is create a new DbSet with Entity as T and run
+
+```
+make migration name=MigrationName
+```
+
+And it generates the Migration code for you.
 
 ## Final Principle
 
