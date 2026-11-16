@@ -1,4 +1,5 @@
 using Bravo.Domain.Auth.Entities;
+using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Users.Entities;
@@ -21,6 +22,21 @@ public class PostgreSQLContext(DbContextOptions<PostgreSQLContext> options) : Db
     public DbSet<ImportFailedRecord> ImportFailedRecords { get; set; }
     public DbSet<ImportDataset> ImportDatasets { get; set; }
     public DbSet<DatasetVersion> DatasetVersions { get; set; }
+    public DbSet<Election> Elections { get; set; }
+    public DbSet<ElectionRound> ElectionRounds { get; set; }
+    public DbSet<ElectoralOffice> ElectoralOffices { get; set; }
+    public DbSet<PoliticalParty> PoliticalParties { get; set; }
+    public DbSet<Federation> Federations { get; set; }
+    public DbSet<Coalition> Coalitions { get; set; }
+    public DbSet<ElectoralZone> ElectoralZones { get; set; }
+    public DbSet<ElectoralSection> ElectoralSections { get; set; }
+    public DbSet<PollingPlace> PollingPlaces { get; set; }
+    public DbSet<PollingPlaceSection> PollingPlaceSections { get; set; }
+    public DbSet<TseMunicipalityCode> TseMunicipalityCodes { get; set; }
+    public DbSet<CandidateIdentity> CandidateIdentities { get; set; }
+    public DbSet<Candidate> Candidates { get; set; }
+    public DbSet<ElectionResult> ElectionResults { get; set; }
+    public DbSet<ElectionStatistics> ElectionStatistics { get; set; }
     public DbSet<State> States { get; set; }
     public DbSet<Municipality> Municipalities { get; set; }
 

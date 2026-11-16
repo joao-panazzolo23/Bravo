@@ -38,6 +38,14 @@ public interface IImportWorkUnitRepository
         string? reason,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Marks the work unit completed after its pipeline has persisted all of its work.
+    /// </summary>
+    Task<bool> CompleteAsync(
+        Guid workUnitId,
+        long fencingToken,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ImportWorkUnit>> GetByJobAsync(
         Guid jobId,
         CancellationToken cancellationToken = default);

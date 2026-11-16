@@ -663,8 +663,9 @@ existing `IImportSource<T>` → `ImportBatchPipeline<T>` → `IImportBatchStore<
       Verified live against `cdn.tse.jus.br` (download + checksum + extraction).
 - [x] **Stage 2 — CSV streaming reader.** Header-driven `;`-delimited reader over a
       `StreamReader` with ISO-8859-1 encoding, tolerant of missing/extra columns.
-- [ ] **Stage 3 — Reference data: elections, rounds, offices, parties, federations,
-      coalitions.** Small reference datasets, upsert by TSE code.
+- [x] **Stage 3 — Reference data: elections, rounds, offices, parties, federations,
+      coalitions.** Verified against 2022/AC: 1 election, 1 round, 7 offices, 27 parties,
+      3 federations (federation sentinel `-1`/`#NULO` normalised to NULL).
 
 > **Stage 3 preparation — fields verified against `consulta_cand_2022_AC.csv`**
 > (542 rows, 1 election), so implementation can begin without further research:
@@ -685,19 +686,45 @@ existing `IImportSource<T>` → `ImportBatchPipeline<T>` → `IImportBatchStore<
 >   distinguishes `PARTIDO ISOLADO` (416) / `FEDERAÇÃO` (109) / `COLIGAÇÃO` (17), so a
 >   candidate is not automatically in a coalition.
 > - Implementation must be idempotent on the natural keys already defined in §5.5.3.
-- [ ] **Stage 4 — Candidates.** Header-mapped parser tolerant of the 50/63-column drift.
-- [ ] **Stage 5 — TSE↔IBGE municipality cross-reference.** Explicit crosswalk table with
+- [x] **Stage 4 — Candidates.** Header-mapped parser tolerant of the 50/63-column drift.
+      Verified: 542 registrations, 539 CPF-keyed identities, 34 coalitions.
+- [x] **Stage 5 — TSE↔IBGE municipality cross-reference.** Explicit crosswalk table with
       preserved TSE codes, per-election validity, match method, confidence and manual
       verification. Automatic matching only for unambiguous cases; unresolved rows are
-      retained and queued for review, never guessed.
-- [ ] **Stage 6 — Electoral zones, polling places, sections.** From
+      retained and queued for review, never guessed. Verified: 22 AC municipalities
+      resolved automatically at confidence 0.60 via normalised name.
+- [x] **Stage 6 — Electoral zones, polling places, sections.** From
       `eleitorado_local_votacao`, including comma-decimal coordinate normalisation.
-- [ ] **Stage 7 — Results and statistics.** Section-level votes with explicit
+- [x] **Stage 7 — Results and statistics.** Section-level votes with explicit
       `VoteType` for blank/null/party/nominal, plus per-section electorate totals.
-- [ ] **Stage 8 — `POST /api/v1/import/tse`.** Dedicated endpoint and orchestration,
+- [x] **Stage 8 — `POST /api/v1/import/tse`.** Dedicated endpoint and orchestration,
       independent from IBGE, reusing `ImportJobScheduler` and the shared engine.
 - [ ] **Stage 9 — Verification.** Idempotent re-run, interrupted-import resume,
       row-count reconciliation against source, dip in duplicate/orphan detection.
+
+> **Verified end-to-end (2022/AC, round 1).** `POST /api/v1/import/tse` with
+> `{year:2022,state:"AC",round:1,electionCode:546}` produced, reconciled against the source:
+>
+> | Fact | Imported | Source file |
+> | --- | --- | --- |
+> | Election rows | 1 | 1 (`CD_ELEICAO` 546) |
+> | Offices | 7 | 7 distinct `CD_CARGO` |
+> | Parties | 27 | 27 distinct `NR_PARTIDO` |
+> | Federations | 3 | 3 (sentinel `-1` excluded) |
+> | Candidates | 542 | 542 rows |
+> | Coalitions | 34 | 34 distinct `(SQ_COLIGACAO, CD_CARGO)` |
+> | Section results | 277,665 | 277,665 rows |
+> | Sections | 2,124 | 2,124 distinct `(muni, zona, seção)` |
+> | Zones | 9 | 9 distinct `NR_ZONA` |
+> | Polling places | 562 | 562 distinct `(NR_ZONA, NR_LOCAL_VOTACAO)` |
+>
+> Vote-type split: Nominal 237,198 rows / 1,672,287 votes; Party 24,394 / 40,163;
+> Blank 7,894 / 46,020; Null 8,179 / 63,282. Blank+Null row counts match the source
+> exactly. `0 unresolved` municipalities and `0 unknown` candidates.
+>
+> Note: 562 polling places is correct, not a bug — 104 `NR_LOCAL_VOTACAO` numbers are
+> reused across zones, so the key must include the zone (229 values are unique only
+> globally, which the schema does not rely on).
 
 ### 6.2. Layout versioning design (decision #2 — binding for Stages 1–2)
 
@@ -772,12 +799,12 @@ Use this section to track the overall implementation progress.
 | IBGE ingestion pipeline           | [x]    |
 | IBGE import endpoint              | [x]    |
 | Geographic data validation        | [x]    |
-| Electoral domain analysis         | [ ]    |
+| Electoral domain analysis         | [x]    |
 | TSE dataset identification        | [x]    |
-| Electoral repositories            | [ ]    |
+| Electoral repositories            | [x]    |
 | TSE acquisition layer             | [x]    |
-| TSE ingestion pipeline            | [ ]    |
-| TSE import endpoint               | [ ]    |
+| TSE ingestion pipeline            | [x]    |
+| TSE import endpoint               | [x]    |
 | Electoral data validation         | [ ]    |
 | End-to-end ingestion verification | [ ]    |
 

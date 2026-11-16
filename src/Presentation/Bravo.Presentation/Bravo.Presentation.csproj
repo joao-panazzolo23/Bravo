@@ -17,6 +17,7 @@
 		<ProjectReference Include="..\..\Domain\Bravo.Domain\Bravo.Domain.csproj" />
 		<ProjectReference Include="..\..\Domain\Bravo.Shared\Bravo.Shared.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Ibge\Bravo.Infrastructure.Ibge.csproj" />
+		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Tse\Bravo.Infrastructure.Tse.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Auth\Bravo.Infrastructure.Auth.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.Email\Bravo.Infrastructure.Email.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\Bravo.Infrastructure.PostgreSQL.Dapper\Bravo.Infrastructure.PostgreSQL.Dapper.csproj" />

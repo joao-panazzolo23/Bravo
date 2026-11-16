@@ -133,6 +133,680 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.ToTable("UserRoles");
                 });
 
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.Candidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BallotNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("CandidateIdentityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CoalitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Education")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("ElectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("FederationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Gender")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Occupation")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Race")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("RegistrationStatus")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SocialName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("StateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("TseCandidateSequential")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UrnName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateIdentityId");
+
+                    b.HasIndex("CoalitionId");
+
+                    b.HasIndex("FederationId");
+
+                    b.HasIndex("OfficeId");
+
+                    b.HasIndex("PartyId");
+
+                    b.HasIndex("StateId");
+
+                    b.HasIndex("ElectionId", "TseCandidateSequential")
+                        .IsUnique();
+
+                    b.HasIndex("ElectionId", "OfficeId", "StateId");
+
+                    b.ToTable("Candidates", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.CandidateIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Cpf")
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Cpf")
+                        .IsUnique();
+
+                    b.ToTable("CandidateIdentities", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.Coalition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Composition")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ElectionRoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("TseCoalitionNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfficeId");
+
+                    b.HasIndex("StateId");
+
+                    b.HasIndex("ElectionRoundId", "OfficeId", "StateId", "TseCoalitionNumber")
+                        .IsUnique();
+
+                    b.ToTable("Coalitions", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.Election", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly?>("ElectionDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("TseElectionCode")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TypeCode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TypeName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TseElectionCode")
+                        .IsUnique();
+
+                    b.HasIndex("Year");
+
+                    b.ToTable("Elections", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectionResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CandidateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DatasetVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ElectionRoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TseBallotNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("VoteType")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Votes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateId");
+
+                    b.HasIndex("DatasetVersionId");
+
+                    b.HasIndex("OfficeId");
+
+                    b.HasIndex("PartyId");
+
+                    b.HasIndex("SectionId");
+
+                    b.HasIndex("ElectionRoundId", "SectionId", "OfficeId");
+
+                    b.HasIndex("ElectionRoundId", "SectionId", "OfficeId", "VoteType", "CandidateId", "PartyId", "TseBallotNumber", "DatasetVersionId")
+                        .IsUnique();
+
+                    b.ToTable("ElectionResults", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ElectionResults_BlankNullHaveNoReferences", "\"VoteType\" NOT IN (3, 4) OR (\"CandidateId\" IS NULL AND \"PartyId\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_ElectionResults_NominalRequiresCandidate", "\"VoteType\" <> 1 OR \"CandidateId\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ElectionResults_PartyRequiresParty", "\"VoteType\" <> 2 OR \"PartyId\" IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectionRound", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ElectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsRunoff")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<short>("Round")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ElectionId", "Round")
+                        .IsUnique();
+
+                    b.ToTable("ElectionRounds", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectionStatistics", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("Absentees")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("Attendees")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("BlankVotes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DatasetVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ElectionRoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("EligibleVoters")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("NullVotes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DatasetVersionId");
+
+                    b.HasIndex("SectionId");
+
+                    b.HasIndex("ElectionRoundId", "SectionId", "DatasetVersionId")
+                        .IsUnique();
+
+                    b.ToTable("ElectionStatistics", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectoralOffice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("TseOfficeCode")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TseOfficeCode")
+                        .IsUnique();
+
+                    b.ToTable("ElectoralOffices", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectoralSection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MunicipalityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TseSectionNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ZoneId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("MunicipalityId", "ZoneId", "TseSectionNumber")
+                        .IsUnique();
+
+                    b.ToTable("ElectoralSections", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectoralZone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("MunicipalityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TseZoneNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MunicipalityId");
+
+                    b.HasIndex("StateId", "TseZoneNumber")
+                        .IsUnique();
+
+                    b.ToTable("ElectoralZones", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.Federation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Acronym")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Composition")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("TseFederationNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TseFederationNumber")
+                        .IsUnique();
+
+                    b.ToTable("Federations", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.PoliticalParty", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Acronym")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("TsePartyNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TsePartyNumber", "Acronym")
+                        .IsUnique();
+
+                    b.ToTable("PoliticalParties", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.PollingPlace", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(10, 7)
+                        .HasColumnType("numeric(10,7)");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(10, 7)
+                        .HasColumnType("numeric(10,7)");
+
+                    b.Property<Guid?>("MunicipalityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("Neighborhood")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("StateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TsePollingPlaceNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ZipCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid?>("ZoneId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MunicipalityId");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("StateId", "ZoneId", "TsePollingPlaceNumber")
+                        .IsUnique();
+
+                    b.ToTable("PollingPlaces", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.PollingPlaceSection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ElectionRoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PollingPlaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PollingPlaceId");
+
+                    b.HasIndex("SectionId");
+
+                    b.HasIndex("ElectionRoundId", "SectionId")
+                        .IsUnique();
+
+                    b.ToTable("PollingPlaceSections", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.TseMunicipalityCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Confidence")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("numeric(3,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ElectionYear")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MatchMethod")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("MunicipalityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RawCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid>("StateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MunicipalityId");
+
+                    b.HasIndex("StateId");
+
+                    b.HasIndex("IsVerified", "Confidence");
+
+                    b.HasIndex("RawCode", "ElectionYear")
+                        .IsUnique();
+
+                    b.ToTable("TseMunicipalityCodes", (string)null);
+                });
+
             modelBuilder.Entity("Bravo.Domain.Geography.Entities.Municipality", b =>
                 {
                     b.Property<Guid>("Id")
@@ -612,6 +1286,218 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.Candidate", b =>
+                {
+                    b.HasOne("Bravo.Domain.Electoral.Entities.CandidateIdentity", null)
+                        .WithMany()
+                        .HasForeignKey("CandidateIdentityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.Coalition", null)
+                        .WithMany()
+                        .HasForeignKey("CoalitionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.Election", null)
+                        .WithMany()
+                        .HasForeignKey("ElectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.Federation", null)
+                        .WithMany()
+                        .HasForeignKey("FederationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralOffice", null)
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.PoliticalParty", null)
+                        .WithMany()
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Bravo.Domain.Geography.Entities.State", null)
+                        .WithMany()
+                        .HasForeignKey("StateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.Coalition", b =>
+                {
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectionRound", null)
+                        .WithMany()
+                        .HasForeignKey("ElectionRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralOffice", null)
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Geography.Entities.State", null)
+                        .WithMany()
+                        .HasForeignKey("StateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectionResult", b =>
+                {
+                    b.HasOne("Bravo.Domain.Electoral.Entities.Candidate", null)
+                        .WithMany()
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Bravo.Domain.Importing.Entities.DatasetVersion", null)
+                        .WithMany()
+                        .HasForeignKey("DatasetVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectionRound", null)
+                        .WithMany()
+                        .HasForeignKey("ElectionRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralOffice", null)
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.PoliticalParty", null)
+                        .WithMany()
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralSection", null)
+                        .WithMany()
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectionRound", b =>
+                {
+                    b.HasOne("Bravo.Domain.Electoral.Entities.Election", null)
+                        .WithMany()
+                        .HasForeignKey("ElectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectionStatistics", b =>
+                {
+                    b.HasOne("Bravo.Domain.Importing.Entities.DatasetVersion", null)
+                        .WithMany()
+                        .HasForeignKey("DatasetVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectionRound", null)
+                        .WithMany()
+                        .HasForeignKey("ElectionRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralSection", null)
+                        .WithMany()
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectoralSection", b =>
+                {
+                    b.HasOne("Bravo.Domain.Geography.Entities.Municipality", null)
+                        .WithMany()
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralZone", null)
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectoralZone", b =>
+                {
+                    b.HasOne("Bravo.Domain.Geography.Entities.Municipality", null)
+                        .WithMany()
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Bravo.Domain.Geography.Entities.State", null)
+                        .WithMany()
+                        .HasForeignKey("StateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.PollingPlace", b =>
+                {
+                    b.HasOne("Bravo.Domain.Geography.Entities.Municipality", null)
+                        .WithMany()
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Bravo.Domain.Geography.Entities.State", null)
+                        .WithMany()
+                        .HasForeignKey("StateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralZone", null)
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.PollingPlaceSection", b =>
+                {
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectionRound", null)
+                        .WithMany()
+                        .HasForeignKey("ElectionRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.PollingPlace", null)
+                        .WithMany()
+                        .HasForeignKey("PollingPlaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralSection", null)
+                        .WithMany()
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.TseMunicipalityCode", b =>
+                {
+                    b.HasOne("Bravo.Domain.Geography.Entities.Municipality", null)
+                        .WithMany()
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Bravo.Domain.Geography.Entities.State", null)
+                        .WithMany()
+                        .HasForeignKey("StateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Bravo.Domain.Geography.Entities.Municipality", b =>

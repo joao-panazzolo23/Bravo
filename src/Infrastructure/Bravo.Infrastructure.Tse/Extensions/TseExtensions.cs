@@ -1,7 +1,12 @@
+using Bravo.Application.Electoral.Contracts;
+using Bravo.Application.Electoral.Services;
+using Bravo.Application.Importing.Contracts;
+using Bravo.Infrastructure.Tse.Acquisition;
 using Bravo.Infrastructure.Tse.Downloads;
 using Bravo.Infrastructure.Tse.Extraction;
 using Bravo.Infrastructure.Tse.Options;
 using Bravo.Infrastructure.Tse.RateLimiting;
+using Bravo.Infrastructure.Tse.Reference;
 using Bravo.Infrastructure.Tse.Resilience;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +25,7 @@ public static class TseExtensions
             .ValidateOnStart();
 
         services.AddSingleton(provider => new TseRateLimiter(
-            provider.GetRequiredService<IOptions<TseOptions>>().Value));
+            provider.GetRequiredService<IOptions<TseOptions>>()));
 
         services.AddSingleton<TseBackoffPolicy>();
 
@@ -32,7 +37,17 @@ public static class TseExtensions
             client.Timeout = TimeSpan.FromSeconds(settings.HttpTimeoutSeconds);
         });
 
-        return services.AddSingleton<TseFileDownloader>()
-                       .AddSingleton<TseArchiveExtractor>();
+        services.AddSingleton<TseFileDownloader>()
+                .AddSingleton<TseArchiveExtractor>()
+                .AddSingleton<ITseDatasetAcquirer, TseDatasetAcquirer>()
+                .AddSingleton<ITseReferenceReader, TseReferenceReader>()
+                .AddSingleton<ITseCandidateReader, TseCandidateReader>()
+                .AddSingleton<ITseSectionResultReader, TseSectionResultReader>();
+
+        return services.AddScoped<IImportPipeline, TseReferencePipeline>()
+                       .AddScoped<IImportPipeline, TseCandidatePipeline>()
+                       .AddScoped<IImportPipeline, TseResultsPipeline>()
+                       .AddScoped<DatasetVersionService>()
+                       .AddScoped<TseMunicipalityResolver>();
     }
 }

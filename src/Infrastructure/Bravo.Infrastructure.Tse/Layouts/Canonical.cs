@@ -43,4 +43,13 @@ public static class Canonical
     public const string Occupation = "Occupation";
     public const string TurnOutcomeCode = "TurnOutcomeCode";
     public const string TurnOutcome = "TurnOutcome";
+    public const string MunicipalityCode = "MunicipalityCode";
+    public const string MunicipalityName = "MunicipalityName";
+    public const string ZoneNumber = "ZoneNumber";
+    public const string SectionNumber = "SectionNumber";
+    public const string BallotName = "BallotName";
+    public const string Votes = "Votes";
+    public const string PollingPlaceNumber = "PollingPlaceNumber";
+    public const string PollingPlaceName = "PollingPlaceName";
+    public const string PollingPlaceAddress = "PollingPlaceAddress";
 }

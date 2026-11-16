@@ -62,8 +62,8 @@ public sealed class TseFileDownloaderTests : IDisposable
 
         return new TseFileDownloader(
             new StubFactory(handler),
-            new TseRateLimiter(value.Value),
-            new TseBackoffPolicy(value.Value),
+            new TseRateLimiter(value),
+            new TseBackoffPolicy(value),
             value,
             NullLogger<TseFileDownloader>.Instance);
     }

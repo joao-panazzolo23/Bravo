@@ -34,7 +34,7 @@ public sealed class ImportJobExecutor(
             if (workUnit is null)
                 return;
 
-            var pipeline = pipelines.SingleOrDefault(candidate => candidate.UnitKey == workUnit.UnitKey);
+            var pipeline = pipelines.SingleOrDefault(candidate => Matches(candidate.UnitKey, workUnit.UnitKey));
 
             if (pipeline is null)
             {
@@ -54,8 +54,7 @@ public sealed class ImportJobExecutor(
         }
     }
 
-    private async Task ProcessWorkUnitAsync(
-        ImportJob job,
+    private async Task ProcessWorkUnitAsync(        ImportJob job,
         ImportWorkUnit workUnit,
         IImportPipeline pipeline,
         string workerId,
@@ -69,6 +68,11 @@ public sealed class ImportJobExecutor(
             try
             {
                 await pipeline.ProcessAsync(job, workUnit, cancellationToken);
+
+                // Pipelines that own their persistence never touch the batch store, so the
+                // unit must be completed here; otherwise its lease expires and it re-runs
+                // forever.
+                await workUnits.CompleteAsync(workUnit.Id, workUnit.FencingToken, cancellationToken);
                 return;
             }
             catch (ImportLeaseLostException exception)
@@ -156,4 +160,13 @@ public sealed class ImportJobExecutor(
             }
         }
     }
+
+    /// <summary>
+    /// A pipeline is registered by stage, while work-unit keys are scoped
+    /// (<c>Stage:Year:State:Round:ElectionCode</c>). A candidate matches when the key equals
+    /// the stage or begins with it followed by the scope separator.
+    /// </summary>
+    private static bool Matches(string pipelineUnitKey, string workUnitKey)
+        => string.Equals(pipelineUnitKey, workUnitKey, StringComparison.Ordinal)
+           || workUnitKey.StartsWith(pipelineUnitKey + ":", StringComparison.Ordinal);
 }

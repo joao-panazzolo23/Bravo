@@ -16,6 +16,8 @@ public static class PostgreSQLDapperExtensions
 {
     public static IServiceCollection AddPostgreSQLDapper(this IServiceCollection services)
     {
+        TypeHandlers.DapperTypeHandlers.Register();
+
         return services.AddDatabaseOptions()
                        .AddDataSource()
                        .AddScoped<PostgreSQLSession>()
@@ -36,7 +38,8 @@ public static class PostgreSQLDapperExtensions
                        .AddScoped<IImportDatasetRepository, ImportDatasetRepository>()
                        .AddScoped<IDatasetVersionRepository, DatasetVersionRepository>()
                        .AddScoped<IImportBatchStore<State>, StateImportBatchStore>()
-                       .AddScoped<IImportBatchStore<IbgeMunicipalityRecord>, MunicipalityImportBatchStore>();
+                       .AddScoped<IImportBatchStore<IbgeMunicipalityRecord>, MunicipalityImportBatchStore>()
+                       .AddElectoralRepositories();
     }
 
     private static IServiceCollection AddDataSource(this IServiceCollection services)
@@ -44,7 +47,11 @@ public static class PostgreSQLDapperExtensions
         services.AddSingleton(sp =>
         {
             var options = sp.GetRequiredService<IOptions<PostgresOptions>>().Value;
-            return NpgsqlDataSource.Create(options.Connection);
+
+            var builder = new NpgsqlDataSourceBuilder(options.Connection);
+            builder.EnableUnmappedTypes();
+
+            return builder.Build();
         });
 
         return services;

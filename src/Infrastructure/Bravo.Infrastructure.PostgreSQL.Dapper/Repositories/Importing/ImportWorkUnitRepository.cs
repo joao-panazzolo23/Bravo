@@ -94,6 +94,31 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
           AND "Status" = 'Running';
         """;
 
+    private const string CompleteWorkUnitSql = """
+        WITH completed AS (
+            UPDATE "ImportWorkUnits"
+            SET "Status" = 'Completed',
+                "LeaseOwner" = NULL,
+                "LeaseExpiresAt" = NULL,
+                "NextAttemptAt" = NULL,
+                "CompletedAt" = now(),
+                "UpdatedAt" = now()
+            WHERE "Id" = @WorkUnitId
+              AND "FencingToken" = @FencingToken
+              AND "Status" = 'Running'
+            RETURNING "JobId"
+        )
+        UPDATE "ImportJobs" AS job
+        SET "UpdatedAt" = now()
+        FROM completed
+        WHERE job."Id" = completed."JobId"
+        RETURNING job."Id";
+        """;
+
+    private const string SelectJobIdSql = """
+        SELECT "JobId" FROM "ImportWorkUnits" WHERE "Id" = @WorkUnitId;
+        """;
+
     private const string SelectByJobSql = """
         SELECT *
         FROM "ImportWorkUnits"
@@ -201,6 +226,40 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
         return affected > 0;
     }
 
+    public async Task<bool> CompleteAsync(
+        Guid workUnitId,
+        long fencingToken,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            CompleteWorkUnitSql,
+            new { WorkUnitId = workUnitId, FencingToken = fencingToken },
+            transaction,
+            cancellationToken: cancellationToken));
+
+        if (affected > 0)
+        {
+            var jobId = await connection.QuerySingleAsync<Guid>(new CommandDefinition(
+                SelectJobIdSql,
+                new { WorkUnitId = workUnitId },
+                transaction,
+                cancellationToken: cancellationToken));
+
+            await connection.ExecuteAsync(new CommandDefinition(
+                ImportJobSql.RefreshState,
+                new { JobId = jobId },
+                transaction,
+                cancellationToken: cancellationToken));
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return affected > 0;
+    }
+
     public async Task<bool> ReleaseAsync(
         Guid workUnitId,
         string workerId,
@@ -218,8 +277,7 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
         return affected > 0;
     }
 
-    public async Task<IReadOnlyList<ImportWorkUnit>> GetByJobAsync(
-        Guid jobId,
+    public async Task<IReadOnlyList<ImportWorkUnit>> GetByJobAsync(        Guid jobId,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);

@@ -24,6 +24,16 @@ public class ImportController(IMediator mediator) : ControllerBase
         return StatusCode(response.StatusCode, response);
     }
 
+    [HttpPost("tse")]
+    // [Authorize(Roles = AuthorizationRoles.Administrators)]
+    public async Task<ActionResult<Result<ImportJobCreatedViewModel>>> StartTse(
+        [FromBody] StartTseImportCommand command
+    )
+    {
+        var response = await mediator.Send(command);
+        return StatusCode(response.StatusCode, response);
+    }
+
     [HttpGet("{id:guid}")]
     // [Authorize(Roles = AuthorizationRoles.Administrators)]
     public async Task<ActionResult<Result<ImportJobStatusViewModel?>>> GetStatus(

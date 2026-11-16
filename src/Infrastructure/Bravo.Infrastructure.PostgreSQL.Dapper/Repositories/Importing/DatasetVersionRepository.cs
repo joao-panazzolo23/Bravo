@@ -15,6 +15,10 @@ internal sealed class DatasetVersionRepository(NpgsqlDataSource dataSource) : ID
         VALUES
             (@Id, @ImportDatasetId, @Scope, @Status, false, @ImportJobId,
              @CreatedAt, @UpdatedAt)
+        ON CONFLICT ("ImportDatasetId", "Scope") DO UPDATE SET
+            "Status" = EXCLUDED."Status",
+            "ImportJobId" = EXCLUDED."ImportJobId",
+            "UpdatedAt" = EXCLUDED."UpdatedAt"
         RETURNING *;
         """;
 

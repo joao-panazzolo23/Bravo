@@ -1,0 +1,28 @@
+namespace Bravo.Application.Electoral.Models;
+
+public sealed record TseCandidateRow(
+    long Sequential,
+    int BallotNumber,
+    int OfficeCode,
+    string OfficeName,
+    string StateAcronym,
+    int PartyNumber,
+    string PartyAcronym,
+    string PartyName,
+    int? FederationNumber,
+    string? FederationName,
+    string? FederationAcronym,
+    long? CoalitionNumber,
+    string? CoalitionName,
+    string? CoalitionComposition,
+    string Name,
+    string UrnName,
+    string? SocialName,
+    string? Cpf,
+    string? RegistrationStatus,
+    string? Gender,
+    string? Education,
+    string? Race,
+    string? Occupation,
+    DateOnly? BirthDate,
+    bool HasCoalition);

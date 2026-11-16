@@ -1,5 +1,6 @@
 using Bravo.Infrastructure.Tse.Options;
 using Bravo.Infrastructure.Tse.Resilience;
+using Microsoft.Extensions.Options;
 using FluentAssertions;
 
 namespace Bravo.UnitTests.Tse;
@@ -7,12 +8,12 @@ namespace Bravo.UnitTests.Tse;
 public sealed class TseBackoffPolicyTests
 {
     private static TseBackoffPolicy Create(int baseDelayMs = 500, int maxDelayMs = 30_000, int maxAttempts = 3)
-        => new(new TseOptions
+        => new(Options.Create(new TseOptions
         {
             RetryBaseDelayMs = baseDelayMs,
             RetryMaxDelayMs = maxDelayMs,
             MaxRetryAttempts = maxAttempts
-        });
+        }));
 
     [Fact]
     public void RetryAfterOverridesBackoff()

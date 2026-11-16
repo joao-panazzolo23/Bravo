@@ -34,8 +34,8 @@ public sealed class TseLiveDownloadTests : IDisposable
 
         var downloader = new TseFileDownloader(
             factory,
-            new TseRateLimiter(options),
-            new TseBackoffPolicy(options),
+            new TseRateLimiter(value),
+            new TseBackoffPolicy(value),
             value,
             NullLogger<TseFileDownloader>.Instance);
 
