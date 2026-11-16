@@ -20,11 +20,17 @@
     <ProjectReference Include="..\..\src\Application\Bravo.Application\Bravo.Application.csproj" />
     <ProjectReference Include="..\..\src\Domain\Bravo.Domain\Bravo.Domain.csproj" />
     <ProjectReference Include="..\..\src\Domain\Bravo.Shared\Bravo.Shared.csproj" />
-    <ProjectReference Include="..\..\src\Infrastructure\Bravo.Infrastructure.Acquisition\Bravo.Infrastructure.Acquisition.csproj" />
+    <ProjectReference Include="..\..\src\Infrastructure\Bravo.Infrastructure.Tse\Bravo.Infrastructure.Tse.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Tse\Fixtures\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

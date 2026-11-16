@@ -33,6 +33,8 @@ public static class PostgreSQLDapperExtensions
         return services.AddScoped<IImportJobRepository, ImportJobRepository>()
                        .AddScoped<IImportWorkUnitRepository, ImportWorkUnitRepository>()
                        .AddScoped<IImportFailedRecordRepository, ImportFailedRecordRepository>()
+                       .AddScoped<IImportDatasetRepository, ImportDatasetRepository>()
+                       .AddScoped<IDatasetVersionRepository, DatasetVersionRepository>()
                        .AddScoped<IImportBatchStore<State>, StateImportBatchStore>()
                        .AddScoped<IImportBatchStore<IbgeMunicipalityRecord>, MunicipalityImportBatchStore>();
     }

@@ -11,6 +11,7 @@
   </Folder>
   <Folder Name="/src/Infrastructure/">
     <Project Path="src/Infrastructure/Bravo.Infrastructure.Ibge/Bravo.Infrastructure.Ibge.csproj" />
+    <Project Path="src/Infrastructure/Bravo.Infrastructure.Tse/Bravo.Infrastructure.Tse.csproj" />
     <Project Path="src/Infrastructure/Bravo.Infrastructure.Auth/Bravo.Infrastructure.Auth.csproj" />
     <Project Path="src/Infrastructure/Bravo.Infrastructure.Email/Bravo.Infrastructure.Email.csproj" />
     <Project Path="src/Infrastructure/Bravo.Infrastructure.PostgreSQL.Dapper/Bravo.Infrastructure.PostgreSQL.Dapper.csproj" />

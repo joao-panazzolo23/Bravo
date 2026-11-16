@@ -1,26 +1,28 @@
 using Bravo.Application.Importing.Contracts;
 using Bravo.Application.Importing.Exceptions;
-using Bravo.Application.Importing.Services;
 using Bravo.Domain.Importing.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Importing.Services;
 
+/// Ugly. Very ugly.
+/// todo: refactor
 public sealed class ImportJobExecutor(
-    IImportJobRepository jobs,
+    IImportJobRepository jobRepository,
     IImportWorkUnitRepository workUnits,
     IEnumerable<IImportPipeline> pipelines,
     ImportRetryPolicy retryPolicy,
-    ILogger<ImportJobExecutor> logger)
+    ILogger<ImportJobExecutor> logger
+)
 {
     public async Task ExecuteAsync(Guid jobId, string workerId, CancellationToken cancellationToken = default)
     {
-        var job = await jobs.GetAsync(jobId, cancellationToken);
+        var job = await jobRepository.GetAsync(jobId, cancellationToken);
 
         if (job is null || job.IsTerminal)
             return;
 
-        if (!await jobs.MarkRunningAsync(jobId, cancellationToken))
+        if (!await jobRepository.MarkRunningAsync(jobId, cancellationToken))
             return;
 
         var leaseDuration = TimeSpan.FromSeconds(job.LeaseDurationSeconds);
@@ -47,7 +49,7 @@ public sealed class ImportJobExecutor(
 
             await ProcessWorkUnitAsync(job, workUnit, pipeline, workerId, leaseDuration, cancellationToken);
 
-            if (await jobs.IsCancellationRequestedAsync(jobId, cancellationToken))
+            if (await jobRepository.IsCancellationRequestedAsync(jobId, cancellationToken))
                 return;
         }
     }

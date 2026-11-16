@@ -22,167 +22,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Bravo.Domain.Acquisition.Entities.DatasetProvenance", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ContentHash")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DataDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DatasetIdentifier")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<Guid>("ExecutionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("FetchedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("FileSizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("FormatDescription")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("OriginalFilename")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("SourceUrl")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Version")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExecutionId", "DatasetIdentifier");
-
-                    b.HasIndex("Provider", "DatasetIdentifier");
-
-                    b.ToTable("DatasetProvenances", (string)null);
-                });
-
-            modelBuilder.Entity("Bravo.Domain.Acquisition.Entities.ImportCheckpoint", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CheckpointData")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<DateTime>("CheckpointedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DatasetKey")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("ExecutionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("RecordsCompleted")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExecutionId", "DatasetKey");
-
-                    b.ToTable("ImportCheckpoints", (string)null);
-                });
-
-            modelBuilder.Entity("Bravo.Domain.Acquisition.Entities.ImportExecution", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CancellationReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CurrentStage")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("FailureDetails")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("OperationType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("RecordsPersisted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RecordsProcessed")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Scope")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OperationType", "Status");
-
-                    b.HasIndex("Status", "CreatedAt");
-
-                    b.ToTable("ImportExecutions", (string)null);
-                });
-
             modelBuilder.Entity("Bravo.Domain.Auth.Entities.Permission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -366,6 +205,118 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .IsUnique();
 
                     b.ToTable("States", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Importing.Entities.DatasetVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ImportDatasetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ImportJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("SupersededAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportJobId");
+
+                    b.HasIndex("Scope")
+                        .IsUnique()
+                        .HasFilter("\"IsActive\"");
+
+                    b.HasIndex("ImportDatasetId", "Scope")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("DatasetVersions", (string)null);
+                });
+
+            modelBuilder.Entity("Bravo.Domain.Importing.Entities.ImportDataset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AcquiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Checksum")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Dataset")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("ElectionYear")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LayoutVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SourceFileName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "Dataset", "ElectionYear", "Checksum")
+                        .IsUnique();
+
+                    b.ToTable("ImportDatasets", (string)null);
                 });
 
             modelBuilder.Entity("Bravo.Domain.Importing.Entities.ImportFailedRecord", b =>
@@ -626,28 +577,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.ToTable("UserRecoveries");
                 });
 
-            modelBuilder.Entity("Bravo.Domain.Acquisition.Entities.DatasetProvenance", b =>
-                {
-                    b.HasOne("Bravo.Domain.Acquisition.Entities.ImportExecution", "Execution")
-                        .WithMany("Provenances")
-                        .HasForeignKey("ExecutionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Execution");
-                });
-
-            modelBuilder.Entity("Bravo.Domain.Acquisition.Entities.ImportCheckpoint", b =>
-                {
-                    b.HasOne("Bravo.Domain.Acquisition.Entities.ImportExecution", "Execution")
-                        .WithMany("Checkpoints")
-                        .HasForeignKey("ExecutionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Execution");
-                });
-
             modelBuilder.Entity("Bravo.Domain.Auth.Entities.Permission", b =>
                 {
                     b.HasOne("Bravo.Domain.Auth.Entities.RolePermission", null)
@@ -696,6 +625,20 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Navigation("State");
                 });
 
+            modelBuilder.Entity("Bravo.Domain.Importing.Entities.DatasetVersion", b =>
+                {
+                    b.HasOne("Bravo.Domain.Importing.Entities.ImportDataset", null)
+                        .WithMany()
+                        .HasForeignKey("ImportDatasetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bravo.Domain.Importing.Entities.ImportJob", null)
+                        .WithMany()
+                        .HasForeignKey("ImportJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("Bravo.Domain.Importing.Entities.ImportFailedRecord", b =>
                 {
                     b.HasOne("Bravo.Domain.Importing.Entities.ImportJob", null)
@@ -729,13 +672,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Bravo.Domain.Acquisition.Entities.ImportExecution", b =>
-                {
-                    b.Navigation("Checkpoints");
-
-                    b.Navigation("Provenances");
                 });
 
             modelBuilder.Entity("Bravo.Domain.Auth.Entities.Role", b =>

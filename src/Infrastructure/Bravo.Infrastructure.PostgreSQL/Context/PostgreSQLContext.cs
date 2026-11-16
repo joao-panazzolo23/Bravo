@@ -19,6 +19,8 @@ public class PostgreSQLContext(DbContextOptions<PostgreSQLContext> options) : Db
     public DbSet<ImportJob> ImportJobs { get; set; }
     public DbSet<ImportWorkUnit> ImportWorkUnits { get; set; }
     public DbSet<ImportFailedRecord> ImportFailedRecords { get; set; }
+    public DbSet<ImportDataset> ImportDatasets { get; set; }
+    public DbSet<DatasetVersion> DatasetVersions { get; set; }
     public DbSet<State> States { get; set; }
     public DbSet<Municipality> Municipalities { get; set; }
 

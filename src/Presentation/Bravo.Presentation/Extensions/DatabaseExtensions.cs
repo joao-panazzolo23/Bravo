@@ -1,3 +1,4 @@
+using Bravo.Infrastructure.Acquisition.Extensions;
 using Bravo.Infrastructure.PostgreSQL.Dapper.Extensions;
 using Bravo.Infrastructure.PostgreSQL.Extensions;
 
@@ -11,7 +12,8 @@ public static class DatabaseExtensions
         )
     {
         return services.AddPostgreSQLDapper()
-                       .AddPostgreSQL(configuration);
+                       .AddPostgreSQL(configuration)
+                       .AddAcquisition(configuration);
     }
 
     public static IApplicationBuilder UseDatabase(this IApplicationBuilder app)

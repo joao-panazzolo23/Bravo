@@ -1,0 +1,46 @@
+namespace Bravo.Infrastructure.Tse.Layouts;
+
+public static class Canonical
+{
+    public const string Year = "Year";
+    public const string ElectionTypeCode = "ElectionTypeCode";
+    public const string ElectionTypeName = "ElectionTypeName";
+    public const string Round = "Round";
+    public const string ElectionCode = "ElectionCode";
+    public const string ElectionDescription = "ElectionDescription";
+    public const string ElectionDate = "ElectionDate";
+    public const string StateAcronym = "StateAcronym";
+    public const string OfficeCode = "OfficeCode";
+    public const string OfficeName = "OfficeName";
+    public const string CandidateSequential = "CandidateSequential";
+    public const string BallotNumber = "BallotNumber";
+    public const string CandidateName = "CandidateName";
+    public const string UrnName = "UrnName";
+    public const string SocialName = "SocialName";
+    public const string Cpf = "Cpf";
+    public const string Email = "Email";
+    public const string RegistrationStatusCode = "RegistrationStatusCode";
+    public const string RegistrationStatus = "RegistrationStatus";
+    public const string AggregationType = "AggregationType";
+    public const string PartyNumber = "PartyNumber";
+    public const string PartyAcronym = "PartyAcronym";
+    public const string PartyName = "PartyName";
+    public const string FederationNumber = "FederationNumber";
+    public const string FederationName = "FederationName";
+    public const string FederationAcronym = "FederationAcronym";
+    public const string FederationComposition = "FederationComposition";
+    public const string CoalitionNumber = "CoalitionNumber";
+    public const string CoalitionName = "CoalitionName";
+    public const string CoalitionComposition = "CoalitionComposition";
+    public const string BirthDate = "BirthDate";
+    public const string GenderCode = "GenderCode";
+    public const string Gender = "Gender";
+    public const string EducationCode = "EducationCode";
+    public const string Education = "Education";
+    public const string RaceCode = "RaceCode";
+    public const string Race = "Race";
+    public const string OccupationCode = "OccupationCode";
+    public const string Occupation = "Occupation";
+    public const string TurnOutcomeCode = "TurnOutcomeCode";
+    public const string TurnOutcome = "TurnOutcome";
+}
