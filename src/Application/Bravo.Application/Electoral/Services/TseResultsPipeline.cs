@@ -3,20 +3,25 @@ using Bravo.Application.Electoral.Models;
 using Bravo.Application.Importing;
 using Bravo.Application.Importing.Contracts;
 using Bravo.Application.Importing.Exceptions;
+using Bravo.Application.Importing.Services;
 using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Electoral.Enums;
 using Bravo.Domain.Importing.Entities;
+using Bravo.Domain.Importing.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Electoral.Services;
 
+
+//todo: refactor. trash code.
 /// <summary>
-/// Imports section-level electoral structure and voting results for one TSE scope.
+/// Imports section-level electoral structure and voting results for one (year, state).
 /// </summary>
 /// <remarks>
-/// Every stored result carries the active <c>DatasetVersionId</c>, so a corrected source file
-/// produces a new version rather than duplicating votes. Rows whose municipality or candidate
-/// cannot be resolved are counted and excluded, never attributed to a guessed entity.
+/// A single file can contain more than one round, distinguished by <c>CD_ELEICAO</c>, so the
+/// round is resolved per row rather than per file. Every stored result carries the active
+/// <c>DatasetVersionId</c>, so a corrected source file produces a new version instead of
+/// duplicating votes.
 /// </remarks>
 public sealed class TseResultsPipeline(
     ITseDatasetAcquirer acquirer,
@@ -25,11 +30,13 @@ public sealed class TseResultsPipeline(
     IElectionRepository elections,
     IElectoralReferenceRepository reference,
     IElectoralStructureRepository structure,
-    IGeographyLookup geography,
+    IGeographyRepository geography,
     ITseMunicipalityCodeRepository municipalityCodes,
     TseMunicipalityResolver municipalityResolver,
     ICandidateRepository candidates,
     IElectionResultRepository results,
+    TseSyntheticScopeSeeder syntheticScopes,
+    ImportProgressReporterFactory progressFactory,
     ILogger<TseResultsPipeline> logger) : IImportPipeline
 {
     private const int BatchSize = 5_000;
@@ -39,18 +46,38 @@ public sealed class TseResultsPipeline(
     public async Task ProcessAsync(
         ImportJob job,
         ImportWorkUnit workUnit,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
-        var scope = TseImportScope.Parse(workUnit.UnitKey);
+        if (!TseImport.TryParseResults(workUnit.UnitKey, out var year, out var state))
+            throw new ImportPermanentException(TseImport.DescribeInvalidKey(workUnit.UnitKey));
 
-        var dataset = await acquirer.AcquireResultsAsync(scope, cancellationToken);
+        using var unitScope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Dataset"] = TseImport.ResultsStage,
+            ["ElectionYear"] = year,
+            ["State"] = state
+        });
+
+        var progress = progressFactory.Create(job, workUnit);
+
+        await progress.StageAsync(ImportStage.Downloading, cancellationToken);
+        logger.LogInformation(
+            "Downloading results dataset. Dataset: {Dataset}, ElectionYear: {Year}, State: {State}.",
+            TseImport.ResultsStage, year, state);
+
+        var dataset = await acquirer.AcquireResultsAsync(year, state, cancellationToken);
+
+        await progress.StageAsync(ImportStage.Extracting, cancellationToken);
 
         var version = await datasetVersions.RegisterAsync(
-            "TSE", "votacao_secao", scope.Year, dataset, ScopeName(scope), job.Id, cancellationToken);
+            "TSE", "votacao_secao", year, dataset,
+            $"TSE:votacao_secao:{year}:{state}", job.Id, cancellationToken);
 
         try
         {
-            await ImportAsync(scope, dataset, version, cancellationToken);
+            await ImportAsync(year, state, dataset, version, progress, cancellationToken);
+            await progress.FlushAsync(cancellationToken);
             await datasetVersions.CompleteAsync(version.Id, cancellationToken);
         }
         catch
@@ -60,15 +87,16 @@ public sealed class TseResultsPipeline(
         }
     }
 
-    private static string ScopeName(TseImportScope scope)
-        => $"TSE:votacao_secao:{scope.Year}:{scope.State}:round-{scope.Round}";
-
     private async Task ImportAsync(
-        TseImportScope scope,
+        int year,
+        string state,
         AcquiredDataset dataset,
         DatasetVersion version,
+        IImportProgressReporter progress,
         CancellationToken cancellationToken)
     {
+        await progress.StageAsync(ImportStage.Reading, cancellationToken);
+
         await using var stream = File.OpenRead(dataset.FilePath);
 
         var rows = reader.Read(stream, dataset.LayoutVersion);
@@ -76,34 +104,43 @@ public sealed class TseResultsPipeline(
         if (rows.Count == 0)
             return;
 
-        var election = await elections.FindByCodeAsync(scope.ElectionCode, cancellationToken)
-            ?? throw new ImportPermanentException(
-                $"Election {scope.ElectionCode} is not imported; run the reference stage first.");
-
-        var round = await elections.FindRoundAsync(election.Id, scope.Round, cancellationToken)
-            ?? throw new ImportPermanentException(
-                $"Round {scope.Round} is not imported; run the reference stage first.");
-
         var stateIds = await geography.GetStateIdsByAcronymAsync(cancellationToken);
 
-        if (!stateIds.TryGetValue(scope.State, out var stateId))
-            throw new ImportPermanentException($"State '{scope.State}' is not imported.");
+        if (!stateIds.TryGetValue(state, out var stateId))
+        {
+            if (!TseScopes.IsSynthetic(state))
+            {
+                throw new ImportPermanentException(
+                    $"State '{state}' is not present in the geography import.");
+            }
 
-        var municipalityIds = await ResolveMunicipalitiesAsync(rows, stateId, scope.Year, cancellationToken);
+            stateId = await syntheticScopes.EnsureAsync(
+                state,
+                (states, token) => geography.UpsertStatesAsync(states, token),
+                cancellationToken);
+        }
 
-        await EnsureStructureAsync(rows, round, stateId, municipalityIds, cancellationToken);
+        var municipalityIds = await ResolveMunicipalitiesAsync(rows, stateId, year, cancellationToken);
 
-        var zoneIds = await structure.GetZoneIdsAsync(cancellationToken);
-        var sectionIds = await structure.GetSectionIdsAsync(cancellationToken);
         var officeIds = await reference.GetOfficeIdsAsync(cancellationToken);
         var partyIds = await reference.GetPartyIdsAsync(cancellationToken);
-        var candidateIds = await candidates.GetCandidateIdsAsync(election.Id, cancellationToken);
+        var zoneIds = await structure.GetZoneIdsAsync(cancellationToken);
+        var sectionIds = await structure.GetSectionIdsAsync(cancellationToken);
+
+        var rounds = new Dictionary<int, Guid>();
+        var candidateCache = new Dictionary<Guid, IReadOnlyDictionary<string, Guid>>();
+
+        // Structure is round-independent, so it is ensured once per file.
+        await EnsureStructureAsync(rows, stateId, municipalityIds, cancellationToken);
+
+        zoneIds = await structure.GetZoneIdsAsync(cancellationToken);
+        sectionIds = await structure.GetSectionIdsAsync(cancellationToken);
 
         var partyByNumber = partyIds
             .GroupBy(entry => entry.Key.Number)
             .ToDictionary(group => group.Key, group => group.First().Value);
 
-        var buffer = new Dictionary<(Guid, Guid, Guid, VoteType, Guid?, Guid?, int), long>(BatchSize);
+        var buffer = new Dictionary<(Guid RoundId, Guid SectionId, Guid OfficeId, VoteType Type, Guid? CandidateId, Guid? PartyId, int Ballot), long>(BatchSize);
         var imported = 0;
         var unresolved = 0;
         var unknownCandidate = 0;
@@ -132,13 +169,35 @@ public sealed class TseResultsPipeline(
             if (!officeIds.TryGetValue(row.OfficeCode, out var officeId))
                 continue;
 
+            var election = await elections.FindByCodeAsync(row.ElectionCode, cancellationToken);
+
+            if (election is null)
+                continue;
+
+            if (!rounds.TryGetValue(row.ElectionCode, out var roundId))
+            {
+                var round = await elections.FindRoundAsync(election.Id, row.Round, cancellationToken);
+
+                if (round is null)
+                    continue;
+
+                roundId = round.Id;
+                rounds[row.ElectionCode] = roundId;
+            }
+
+            if (!candidateCache.TryGetValue(election.Id, out var candidateIds))
+            {
+                candidateIds = await candidates.GetCandidateIdsAsync(election.Id, stateId, cancellationToken);
+                candidateCache[election.Id] = candidateIds;
+            }
+
             var voteType = TseVoteClassifier.Classify(row.BallotNumber, row.CandidateSequential);
             Guid? candidateId = null;
             Guid? partyId = null;
 
             if (voteType == VoteType.Nominal)
             {
-                if (!candidateIds.TryGetValue(row.CandidateSequential!.Value, out var resolved))
+                if (!candidateIds.TryGetValue(row.CandidateSequential!, out var resolved))
                 {
                     unknownCandidate++;
                     continue;
@@ -154,41 +213,37 @@ public sealed class TseResultsPipeline(
                 partyId = resolvedParty;
             }
 
-            var key = (
-                round.Id, sectionId, officeId, voteType, candidateId, partyId, row.BallotNumber);
+            var key = (roundId, sectionId, officeId, voteType, candidateId, partyId, row.BallotNumber);
 
-            if (buffer.TryGetValue(key, out var existing))
-            {
-                buffer[key] = existing + row.Votes;
-            }
-            else
-            {
-                buffer[key] = row.Votes;
-            }
-
-            imported++;
+            buffer[key] = buffer.TryGetValue(key, out var existing) ? existing + row.Votes : row.Votes;
 
             if (buffer.Count >= BatchSize)
             {
-                await FlushAsync(buffer, round.Id, version.Id, cancellationToken);
+                await progress.StageAsync(ImportStage.Persisting, cancellationToken);
+                imported += await FlushAsync(buffer, version.Id, cancellationToken);
+
+                await progress.RecordsAsync(
+                    imported, imported, 0, 0,
+                    cancellationToken: cancellationToken);
             }
         }
 
-        await FlushAsync(buffer, round.Id, version.Id, cancellationToken);
+        imported += await FlushAsync(buffer, version.Id, cancellationToken);
+
+        await progress.RecordsAsync(imported, imported, 0, 0, cancellationToken: cancellationToken);
 
         logger.LogInformation(
-            "Imported {Imported} section results for {Year}/{State} round {Round}; {Unresolved} unresolved, {UnknownCandidate} unknown candidate.",
-            imported, scope.Year, scope.State, scope.Round, unresolved, unknownCandidate);
+            "Imported {Imported} section results for {Year}/{State}; {Unresolved} unresolved, {UnknownCandidate} unknown candidate, {Rounds} rounds.",
+            imported, year, state, unresolved, unknownCandidate, rounds.Count);
     }
 
-    private async Task FlushAsync(
+    private async Task<int> FlushAsync(
         Dictionary<(Guid, Guid, Guid, VoteType, Guid?, Guid?, int), long> buffer,
-        Guid roundId,
         Guid versionId,
         CancellationToken cancellationToken)
     {
         if (buffer.Count == 0)
-            return;
+            return 0;
 
         var batch = buffer
             .Select(entry => ElectionResult.Create(
@@ -205,7 +260,10 @@ public sealed class TseResultsPipeline(
 
         await results.UpsertResultsAsync(batch, cancellationToken);
 
+        var count = buffer.Count;
         buffer.Clear();
+
+        return count;
     }
 
     private async Task<IReadOnlyDictionary<string, Guid?>> ResolveMunicipalitiesAsync(
@@ -223,15 +281,11 @@ public sealed class TseResultsPipeline(
 
         await municipalityCodes.UpsertAsync(resolved, cancellationToken);
 
-        return resolved.ToDictionary(
-            code => code.RawCode,
-            code => code.MunicipalityId,
-            StringComparer.Ordinal);
+        return resolved.ToDictionary(code => code.RawCode, code => code.MunicipalityId, StringComparer.Ordinal);
     }
 
     private async Task EnsureStructureAsync(
         IReadOnlyList<TseSectionResultRow> rows,
-        ElectionRound round,
         Guid stateId,
         IReadOnlyDictionary<string, Guid?> municipalityIds,
         CancellationToken cancellationToken)
@@ -239,12 +293,14 @@ public sealed class TseResultsPipeline(
         var resolved = rows
             .Where(row => municipalityIds.TryGetValue(row.TseMunicipalityCode, out var id) && id is not null)
             .Select(row => (Row: row, MunicipalityId: municipalityIds[row.TseMunicipalityCode]!.Value))
+            .Distinct()
             .ToArray();
+
+        if (resolved.Length == 0)
+            return;
 
         var zoneIds = await structure.GetZoneIdsAsync(cancellationToken);
 
-        // Zones are unique per (StateId, TseZoneNumber); a zone can span municipalities, so
-        // dedupe on the actual constraint key and keep one representative municipality.
         var newZones = resolved
             .GroupBy(item => item.Row.ZoneNumber)
             .Where(group => !zoneIds.ContainsKey((stateId, group.Key)))
@@ -265,9 +321,7 @@ public sealed class TseResultsPipeline(
         var newSections = resolved
             .Select(item => (item.MunicipalityId, item.Row.ZoneNumber, item.Row.SectionNumber))
             .Distinct()
-            .Select(key => (
-                key,
-                ZoneId: zoneIds.TryGetValue((stateId, key.ZoneNumber), out var zoneId) ? zoneId : (Guid?)null))
+            .Select(key => (key, ZoneId: zoneIds.TryGetValue((stateId, key.ZoneNumber), out var zoneId) ? zoneId : (Guid?)null))
             .Where(item => item.ZoneId is not null
                            && !sectionIds.ContainsKey((item.key.MunicipalityId, item.ZoneId!.Value, item.key.SectionNumber)))
             .Select(item => ElectoralSection.Create(item.key.MunicipalityId, item.ZoneId!.Value, item.key.SectionNumber))
@@ -282,17 +336,9 @@ public sealed class TseResultsPipeline(
         var placeIds = await structure.GetPollingPlaceIdsAsync(cancellationToken);
 
         var newPlaces = resolved
-            .GroupBy(item => item.Row.ZoneNumber)
-            .SelectMany(group => group
-                .GroupBy(item => item.Row.PollingPlaceNumber)
-                .Select(placeGroup => (
-                    Row: placeGroup.First().Row,
-                    MunicipalityId: placeGroup.First().MunicipalityId,
-                    ZoneNumber: group.Key,
-                    PollingPlaceNumber: placeGroup.Key)))
-            .Select(item => (
-                item,
-                ZoneId: zoneIds.TryGetValue((stateId, item.ZoneNumber), out var zoneId) ? zoneId : (Guid?)null))
+            .Select(item => (item.Row, item.MunicipalityId, item.Row.ZoneNumber, item.Row.PollingPlaceNumber))
+            .Distinct()
+            .Select(item => (item, ZoneId: zoneIds.TryGetValue((stateId, item.ZoneNumber), out var zoneId) ? zoneId : (Guid?)null))
             .Where(item => item.ZoneId is not null
                            && !placeIds.ContainsKey((stateId, item.ZoneId, item.item.PollingPlaceNumber)))
             .Select(item => PollingPlace.Create(
@@ -310,23 +356,44 @@ public sealed class TseResultsPipeline(
             placeIds = await structure.GetPollingPlaceIdsAsync(cancellationToken);
         }
 
-        var assignments = new Dictionary<Guid, PollingPlaceSection>(sectionIds.Count);
+        var roundsByElection = rows
+            .GroupBy(row => (row.ElectionCode, row.Round))
+            .ToArray();
 
-        foreach (var item in resolved)
+        var assignments = new Dictionary<(Guid RoundId, Guid SectionId), PollingPlaceSection>();
+
+        foreach (var roundGroup in roundsByElection)
         {
-            if (!zoneIds.TryGetValue((stateId, item.Row.ZoneNumber), out var zoneId))
+            var election = await elections.FindByCodeAsync(roundGroup.Key.ElectionCode, cancellationToken);
+
+            if (election is null)
                 continue;
 
-            if (!sectionIds.TryGetValue((item.MunicipalityId, zoneId, item.Row.SectionNumber), out var sectionId))
+            var round = await elections.FindRoundAsync(election.Id, roundGroup.Key.Round, cancellationToken);
+
+            if (round is null)
                 continue;
 
-            if (assignments.ContainsKey(sectionId))
-                continue;
+            foreach (var row in roundGroup)
+            {
+                if (!municipalityIds.TryGetValue(row.TseMunicipalityCode, out var municipalityId)
+                    || municipalityId is null)
+                {
+                    continue;
+                }
 
-            if (!placeIds.TryGetValue((stateId, zoneId, item.Row.PollingPlaceNumber), out var placeId))
-                continue;
+                if (!zoneIds.TryGetValue((stateId, row.ZoneNumber), out var zoneId))
+                    continue;
 
-            assignments[sectionId] = PollingPlaceSection.Create(round.Id, placeId, sectionId);
+                if (!sectionIds.TryGetValue((municipalityId.Value, zoneId, row.SectionNumber), out var sectionId))
+                    continue;
+
+                if (!placeIds.TryGetValue((stateId, zoneId, row.PollingPlaceNumber), out var placeId))
+                    continue;
+
+                assignments[(round.Id, sectionId)] =
+                    PollingPlaceSection.Create(round.Id, placeId, sectionId);
+            }
         }
 
         if (assignments.Count > 0)

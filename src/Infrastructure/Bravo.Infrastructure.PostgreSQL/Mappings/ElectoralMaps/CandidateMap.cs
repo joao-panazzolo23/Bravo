@@ -10,6 +10,7 @@ internal sealed class CandidateMap : EntityMapper<Candidate>
     {
         builder.ToTable("Candidates");
 
+        builder.Property(x => x.TseCandidateSequential).HasMaxLength(50).IsRequired();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.UrnName).HasMaxLength(200).IsRequired();
         builder.Property(x => x.SocialName).HasMaxLength(200);
@@ -20,7 +21,16 @@ internal sealed class CandidateMap : EntityMapper<Candidate>
         builder.Property(x => x.Occupation).HasMaxLength(150);
         builder.Property(x => x.BirthDate);
 
-        builder.HasIndex(x => new { x.ElectionId, x.TseCandidateSequential }).IsUnique();
+        builder.HasIndex(x => new
+        {
+            x.ElectionId,
+            x.StateId,
+            x.OfficeId,
+            x.TseCandidateSequential,
+            x.BallotNumber,
+            x.Name
+        })
+            .IsUnique();
         builder.HasIndex(x => new { x.ElectionId, x.OfficeId, x.StateId });
         builder.HasIndex(x => x.CandidateIdentityId);
 

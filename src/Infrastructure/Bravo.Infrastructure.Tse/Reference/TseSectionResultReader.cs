@@ -37,7 +37,7 @@ public sealed class TseSectionResultReader : ITseSectionResultReader
                 BallotName: values[Canonical.BallotName],
                 Votes: TseValues.ParseLong(values[Canonical.Votes]),
                 PollingPlaceNumber: TseValues.ParseInt(values[Canonical.PollingPlaceNumber]),
-                CandidateSequential: TseValues.ParseNullableLong(
+                CandidateSequential: TseValues.Optional(
                     values.GetValueOrDefault(Canonical.CandidateSequential))));
         }
 

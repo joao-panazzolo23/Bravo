@@ -1,5 +1,4 @@
 using Bravo.Application.Electoral.Contracts;
-using Bravo.Application.Importing;
 using Bravo.Infrastructure.Tse.Downloads;
 using Bravo.Infrastructure.Tse.Extraction;
 using Bravo.Infrastructure.Tse.Options;
@@ -12,50 +11,78 @@ internal sealed class TseDatasetAcquirer(
     TseArchiveExtractor extractor,
     IOptions<TseOptions> options) : ITseDatasetAcquirer
 {
-    public Task<AcquiredDataset> AcquireCandidatesAsync(
-        TseImportScope scope,
-        CancellationToken cancellationToken = default)
-        => AcquireAsync(
-            scope,
-            $"estatistica/sead/odsele/consulta_cand/consulta_cand_{scope.Year}.zip",
-            $"consulta_cand_{scope.Year}.zip",
-            $"_{scope.State}.csv",
-            CandidateLayoutFor(scope.Year),
-            cancellationToken);
+    private const string CandidatePrefix = "consulta_cand_";
+    private const string ResultsPrefix = "votacao_secao_";
 
-    public Task<AcquiredDataset> AcquireResultsAsync(
-        TseImportScope scope,
+    public async Task<IReadOnlyList<AcquiredCandidateFile>> AcquireCandidatesAsync(
+        int year,
         CancellationToken cancellationToken = default)
-        => AcquireAsync(
-            scope,
-            $"estatistica/sead/odsele/votacao_secao/votacao_secao_{scope.Year}_{scope.State}.zip",
-            $"votacao_secao_{scope.Year}_{scope.State}.zip",
-            $"_{scope.State}.csv",
-            SectionResultLayoutFor(scope.Year),
-            cancellationToken);
-
-    private async Task<AcquiredDataset> AcquireAsync(
-        TseImportScope scope,
-        string relativeUrl,
-        string archiveName,
-        string entrySuffix,
-        string layoutVersion,
-        CancellationToken cancellationToken)
     {
-        var downloaded = await downloader.DownloadAsync(relativeUrl, archiveName, cancellationToken);
+        var archiveUrl = $"estatistica/sead/odsele/consulta_cand/{CandidatePrefix}{year}.zip";
+        var archiveName = $"{CandidatePrefix}{year}.zip";
 
-        var extractDirectory = Path.Combine(
+        var downloaded = await downloader.DownloadAsync(archiveUrl, archiveName, cancellationToken);
+
+        var destination = Path.Combine(
             options.Value.TempDirectory,
-            $"extract-{Guid.CreateVersion7():N}");
+            $"cand-{year}-{Guid.CreateVersion7():N}");
 
         var extracted = extractor.Extract(
             downloaded.FilePath,
-            extractDirectory,
-            entryFilter: name => name.EndsWith(entrySuffix, StringComparison.OrdinalIgnoreCase));
+            destination,
+            entryFilter: name => IsCandidateEntry(name, year));
+
+        var layoutVersion = CandidateLayoutFor(year);
+
+        var files = new List<AcquiredCandidateFile>(extracted.Count);
+
+        foreach (var file in extracted)
+        {
+            var state = ExtractState(Path.GetFileNameWithoutExtension(file.FilePath));
+            var extension = Path.GetExtension(file.FilePath);
+
+            var located = Path.Combine(destination, $"{CandidatePrefix}{year}_{state}{extension}");
+
+            if (!string.Equals(file.FilePath, located, StringComparison.Ordinal))
+                File.Move(file.FilePath, located, overwrite: true);
+
+            files.Add(new AcquiredCandidateFile(
+                state,
+                new AcquiredDataset(
+                    located,
+                    Path.GetFileName(located),
+                    file.SizeBytes,
+                    downloaded.Sha256,
+                    downloaded.SourceUrl,
+                    layoutVersion)));
+        }
+
+        return files;
+    }
+
+    public async Task<AcquiredDataset> AcquireResultsAsync(
+        int year,
+        string state,
+        CancellationToken cancellationToken = default)
+    {
+        var upper = state.ToUpperInvariant();
+        var archiveUrl = $"estatistica/sead/odsele/votacao_secao/{ResultsPrefix}{year}_{upper}.zip";
+        var archiveName = $"{ResultsPrefix}{year}_{upper}.zip";
+
+        var downloaded = await downloader.DownloadAsync(archiveUrl, archiveName, cancellationToken);
+
+        var destination = Path.Combine(
+            options.Value.TempDirectory,
+            $"results-{year}-{upper}-{Guid.CreateVersion7():N}");
+
+        var extracted = extractor.Extract(
+            downloaded.FilePath,
+            destination,
+            entryFilter: name => name.EndsWith($"_{upper}.csv", StringComparison.OrdinalIgnoreCase));
 
         var match = extracted.FirstOrDefault()
             ?? throw new TseArchiveException(
-                $"Archive '{relativeUrl}' contains no entry ending with '{entrySuffix}'.");
+                $"Archive '{archiveUrl}' contains no entry for state '{upper}'.");
 
         return new AcquiredDataset(
             match.FilePath,
@@ -63,19 +90,35 @@ internal sealed class TseDatasetAcquirer(
             match.SizeBytes,
             downloaded.Sha256,
             downloaded.SourceUrl,
-            layoutVersion);
+            SectionResultLayoutFor(year));
+    }
+
+    private static bool IsCandidateEntry(string entryName, int year)
+        => Path.GetFileName(entryName).StartsWith($"{CandidatePrefix}{year}_", StringComparison.OrdinalIgnoreCase)
+           && entryName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Extracts the scope token from a name such as <c>consulta_cand_2022_SP</c>. The token is
+    /// a state acronym, or one of the national scopes <c>BR</c> / <c>BRASIL</c>.
+    /// </summary>
+    private static string ExtractState(string fileNameWithoutExtension)
+    {
+        var prefix = fileNameWithoutExtension.LastIndexOf('_');
+
+        return fileNameWithoutExtension[(prefix + 1)..].ToUpperInvariant();
     }
 
     private static string CandidateLayoutFor(int year) => year switch
     {
-        2022 or 2014 => "cand-2022-v1",
-        2010 or 2006 => "cand-2010-v1",
+        >= 2014 and <= 2026 => "cand-2022-v1",
+        >= 2006 and <= 2012 => "cand-2010-v1",
+        >= 1994 and <= 2004 => "cand-2010-v1",
         _ => throw new NotSupportedException($"No candidate layout is registered for {year}.")
     };
 
     private static string SectionResultLayoutFor(int year) => year switch
     {
-        2022 => "vot-secao-2022-v1",
+        >= 1998 and <= 2026 => "vot-secao-2022-v1",
         _ => throw new NotSupportedException($"No section result layout is registered for {year}.")
     };
 }

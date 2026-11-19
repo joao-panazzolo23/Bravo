@@ -139,7 +139,7 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
             SelectOfficesSql,
             cancellationToken: cancellationToken));
 
-        return rows.ToDictionary(row => row.Code, row => row.Id);
+        return rows.GroupBy(row => row.Code).ToDictionary(g => g.Key, g => g.First().Id);
     }
 
     public async Task<IReadOnlyDictionary<(int Number, string Acronym), Guid>> GetPartyIdsAsync(
@@ -151,9 +151,11 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
             SelectPartiesSql,
             cancellationToken: cancellationToken));
 
-        return rows.ToDictionary(
-            row => (row.TsePartyNumber, row.Acronym),
-            row => row.Id);
+        // Acronym casing drifts between years (for example "PC do B" vs "PC DO B"), so the
+        // key is case-insensitive and duplicate variants collapse to the first row.
+        return rows
+            .GroupBy(row => (row.TsePartyNumber, row.Acronym.ToUpperInvariant()))
+            .ToDictionary(group => group.Key, group => group.First().Id);
     }
 
     public async Task<IReadOnlyDictionary<int, Guid>> GetFederationIdsAsync(
@@ -165,7 +167,7 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
             SelectFederationsSql,
             cancellationToken: cancellationToken));
 
-        return rows.ToDictionary(row => row.Number, row => row.Id);
+        return rows.GroupBy(row => row.Number).ToDictionary(g => g.Key, g => g.First().Id);
     }
 
     private sealed record PartyKeyRow(int TsePartyNumber, string Acronym, Guid Id);

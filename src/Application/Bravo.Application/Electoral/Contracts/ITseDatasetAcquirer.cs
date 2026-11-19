@@ -14,18 +14,24 @@ public sealed record AcquiredDataset(
 public interface ITseDatasetAcquirer
 {
     /// <summary>
-    /// Downloads the candidate archive for the scope and returns the extracted CSV for the
-    /// requested state.
+    /// Downloads the candidate archive for <paramref name="year"/> and extracts every state
+    /// entry it contains. The state list is discovered from the archive, never hardcoded.
     /// </summary>
-    Task<AcquiredDataset> AcquireCandidatesAsync(
-        TseImportScope scope,
-        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AcquiredCandidateFile>> AcquireCandidatesAsync(
+        int year,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
-    /// Downloads the section-results archive for the scope and returns the extracted CSV for
-    /// the requested state.
+    /// Downloads and extracts the section-results archive for a single (year, state).
     /// </summary>
     Task<AcquiredDataset> AcquireResultsAsync(
-        TseImportScope scope,
-        CancellationToken cancellationToken = default);
+        int year,
+        string state,
+        CancellationToken cancellationToken = default
+    );
 }
+
+public sealed record AcquiredCandidateFile(
+    string StateAcronym,
+    AcquiredDataset Dataset);

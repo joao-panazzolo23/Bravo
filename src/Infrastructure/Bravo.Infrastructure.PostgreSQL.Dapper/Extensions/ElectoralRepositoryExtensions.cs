@@ -15,6 +15,6 @@ public static class ElectoralRepositoryExtensions
                        .AddScoped<IElectoralStructureRepository, ElectoralStructureRepository>()
                        .AddScoped<IElectionResultRepository, ElectionResultRepository>()
                        .AddScoped<ITseMunicipalityCodeRepository, TseMunicipalityCodeRepository>()
-                       .AddScoped<IGeographyLookup, GeographyLookup>();
+                       .AddScoped<IGeographyRepository, GeographyLookup>();
     }
 }

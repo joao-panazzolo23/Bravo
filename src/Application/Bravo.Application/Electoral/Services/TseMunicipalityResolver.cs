@@ -12,7 +12,7 @@ namespace Bravo.Application.Electoral.Services;
 /// municipality within the same state. Ambiguous or missing matches stay unresolved and are
 /// stored with a low confidence so they can be reviewed.
 /// </remarks>
-public sealed class TseMunicipalityResolver(IGeographyLookup geography)
+public sealed class TseMunicipalityResolver(IGeographyRepository geography)
 {
     public const decimal ExactConfidence = 1.00m;
     public const decimal NameConfidence = 0.60m;

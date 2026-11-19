@@ -8,12 +8,17 @@ public interface IElectionRepository
 
     Task<ElectionRound> UpsertRoundAsync(
         ElectionRound round,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
-    Task<Election?> FindByCodeAsync(int tseElectionCode, CancellationToken cancellationToken = default);
+    Task<Election?> FindByCodeAsync(
+        int tseElectionCode,
+        CancellationToken cancellationToken = default
+    );
 
     Task<ElectionRound?> FindRoundAsync(
         Guid electionId,
         short round,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

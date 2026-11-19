@@ -37,6 +37,7 @@ public static class ApplicationExtensions
     {
         return services.AddScoped<ImportJobExecutor>()
                        .AddScoped<ImportJobScheduler>()
+                       .AddScoped<ImportProgressReporterFactory>()
                        .AddScoped<ImportRetryPolicy>();
     }
 }

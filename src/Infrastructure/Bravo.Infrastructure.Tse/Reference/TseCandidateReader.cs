@@ -26,7 +26,9 @@ public sealed class TseCandidateReader : ITseCandidateReader
             var hasCoalition = !string.Equals(aggregationType, NoCoalitionMarker, StringComparison.OrdinalIgnoreCase);
 
             rows.Add(new TseCandidateRow(
-                Sequential: TseValues.ParseLong(values[Canonical.CandidateSequential]),
+                ElectionCode: TseValues.ParseInt(values[Canonical.ElectionCode]),
+                Round: (short)TseValues.ParseInt(values[Canonical.Round]),
+                Sequential: values[Canonical.CandidateSequential].Trim(),
                 BallotNumber: TseValues.ParseInt(values[Canonical.BallotNumber]),
                 OfficeCode: TseValues.ParseInt(values[Canonical.OfficeCode]),
                 OfficeName: values[Canonical.OfficeName],

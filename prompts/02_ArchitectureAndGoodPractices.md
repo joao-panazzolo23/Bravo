@@ -26,6 +26,7 @@ It should contain:
 - Domain interfaces when they represent genuine domain abstractions.
 - Business rules and invariants.
 - Domain events, if applicable.
+- Domain services (interfaces) such as repositories. They must never be placed at Application.
 
 It must NOT depend on:
 
@@ -176,6 +177,8 @@ Only one class inside each file. It keeps code traceable and findable.
 Using clean architecture, orchestration must be always made at Application.
 
 Domain Services should be interfaces set in domain and implemented at Infrastructure.
+
+Do not use Tuples when using domain services. Create a record to represent much more cohesive code.
 
 Each infrastructure project must have one reason to change.
 If you need to make requests to two differente API`s of different contexts,

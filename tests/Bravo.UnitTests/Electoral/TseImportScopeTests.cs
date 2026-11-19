@@ -6,48 +6,70 @@ namespace Bravo.UnitTests.Electoral;
 public sealed class TseImportScopeTests
 {
     [Fact]
-    public void BuildsAndParsesAllThreeStageKeys()
+    public void BuildsAndParsesReferenceAndCandidateKeys()
     {
-        var keys = TseImport.KeysFor(2022, "ac", 1, 546);
+        var reference = TseImport.ReferenceKey(2022);
+        var candidates = TseImport.CandidatesKey(2022);
 
-        keys.Should().HaveCount(3);
+        TseImport.TryParseYear(reference, TseImport.ReferenceStage, out var referenceYear)
+            .Should().BeTrue();
+        TseImport.TryParseYear(candidates, TseImport.CandidatesStage, out var candidateYear)
+            .Should().BeTrue();
 
-        foreach (var key in keys)
-        {
-            TseImport.TryParse(key, out var stage, out var year, out var state, out var round, out var electionCode)
-                .Should().BeTrue();
-
-            year.Should().Be(2022);
-            state.Should().Be("AC");
-            round.Should().Be(1);
-            electionCode.Should().Be(546);
-            stage.Should().StartWith("Tse");
-        }
+        referenceYear.Should().Be(2022);
+        candidateYear.Should().Be(2022);
     }
 
     [Fact]
-    public void PreservesStageIdentity()
+    public void BuildsAndParsesResultKeysWithState()
     {
-        var scope = TseImportScope.Parse(TseImport.KeysFor(2022, "AC", 2, 547)[2]);
+        var key = TseImport.ResultsKey(2022, "ac");
 
-        scope.Stage.Should().Be(TseImport.ResultsStage);
-        scope.Round.Should().Be(2);
+        TseImport.TryParseResults(key, out var year, out var state).Should().BeTrue();
+
+        year.Should().Be(2022);
+        state.Should().Be("AC");
+    }
+
+    [Fact]
+    public void ReferenceAndCandidateKeysDoNotCollide()
+    {
+        TseImport.ReferenceKey(2022).Should().NotBe(TseImport.CandidatesKey(2022));
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("TseResults")]
-    [InlineData("TseResults:2022:AC")]
-    [InlineData("TseResults:abc:AC:1:546")]
-    public void RejectsMalformedKeys(string key)
+    [InlineData("TseResults:2022")]
+    [InlineData("TseResults:abc:AC")]
+    public void RejectsMalformedResultKeys(string key)
     {
-        TseImport.TryParse(key, out _, out _, out _, out _, out _).Should().BeFalse();
+        TseImport.TryParseResults(key, out _, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RejectsWrongStageWhenParsingYear()
+    {
+        TseImport.TryParseYear(TseImport.ResultsKey(2022, "AC"), TseImport.CandidatesStage, out _)
+            .Should().BeFalse();
     }
 
     [Fact]
     public void RecognisesItsOwnKeys()
     {
-        TseImport.IsTseUnitKey(TseImport.KeysFor(2022, "AC", 1, 546)[0]).Should().BeTrue();
+        TseImport.IsTseUnitKey(TseImport.ReferenceKey(2022)).Should().BeTrue();
+        TseImport.IsTseUnitKey(TseImport.ResultsKey(2022, "SP")).Should().BeTrue();
         TseImport.IsTseUnitKey("IbgeStates").Should().BeFalse();
+    }
+
+    [Fact]
+    public void YearCatalogIsOrderedAndComplete()
+    {
+        TseYears.Candidates.Should().BeInAscendingOrder();
+        TseYears.Results.Should().BeInAscendingOrder();
+        TseYears.Candidates.Min().Should().Be(1994);
+        TseYears.Results.Min().Should().Be(1998);
+        TseYears.Candidates.Should().Contain(2022);
+        TseYears.Results.Should().Contain(2022);
     }
 }

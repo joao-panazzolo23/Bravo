@@ -12,7 +12,8 @@ public interface ICandidateRepository
         IReadOnlyCollection<Candidate> candidates,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyDictionary<long, Guid>> GetCandidateIdsAsync(
+    Task<IReadOnlyDictionary<string, Guid>> GetCandidateIdsAsync(
         Guid electionId,
+        Guid stateId,
         CancellationToken cancellationToken = default);
 }

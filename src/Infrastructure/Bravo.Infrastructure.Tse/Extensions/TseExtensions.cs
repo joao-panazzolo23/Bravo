@@ -48,6 +48,7 @@ public static class TseExtensions
                        .AddScoped<IImportPipeline, TseCandidatePipeline>()
                        .AddScoped<IImportPipeline, TseResultsPipeline>()
                        .AddScoped<DatasetVersionService>()
-                       .AddScoped<TseMunicipalityResolver>();
+                       .AddScoped<TseMunicipalityResolver>()
+                       .AddScoped<TseSyntheticScopeSeeder>();
     }
 }

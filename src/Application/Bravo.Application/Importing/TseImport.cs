@@ -3,12 +3,16 @@ using System.Globalization;
 namespace Bravo.Application.Importing;
 
 /// <summary>
-/// TSE import stages and the scoped unit-key format they use.
+/// TSE import stages and the unit-key format each stage uses.
 /// </summary>
 /// <remarks>
-/// The scope is encoded in the work-unit key because <c>ImportWorkUnits.UnitKey</c> is
-/// already durable and unique per job. This avoids a second table purely to carry scope.
-/// Format: <c>{stage}:{year}:{state}:{round}:{electionCode}</c>.
+/// Work-unit keys are durable and unique per job, so the import scope is encoded directly in
+/// the key. This lets a multi-hour import resume per (year, state) without a second table.
+/// Formats:
+/// <list type="bullet">
+/// <item><c>TseCandidates:{year}</c> — one unit per candidate archive.</item>
+/// <item><c>TseResults:{year}:{state}</c> — one unit per (year, state) results archive.</item>
+/// </list>
 /// </remarks>
 public static class TseImport
 {
@@ -18,47 +22,41 @@ public static class TseImport
 
     private const char Separator = ':';
 
-    public static string Build(string stage, int year, string state, short round, int electionCode)
+    public static string ReferenceKey(int year)
+        => string.Create(CultureInfo.InvariantCulture, $"{ReferenceStage}{Separator}{year}");
+
+    public static string CandidatesKey(int year)
+        => string.Create(CultureInfo.InvariantCulture, $"{CandidatesStage}{Separator}{year}");
+
+    public static string ResultsKey(int year, string state)
         => string.Create(
             CultureInfo.InvariantCulture,
-            $"{stage}{Separator}{year}{Separator}{state.ToUpperInvariant()}{Separator}{round}{Separator}{electionCode}");
+            $"{ResultsStage}{Separator}{year}{Separator}{state.ToUpperInvariant()}");
 
-    public static string[] KeysFor(int year, string state, short round, int electionCode) =>
-    [
-        Build(ReferenceStage, year, state, round, electionCode),
-        Build(CandidatesStage, year, state, round, electionCode),
-        Build(ResultsStage, year, state, round, electionCode)
-    ];
-
-    public static bool TryParse(
-        string unitKey,
-        out string stage,
-        out int year,
-        out string state,
-        out short round,
-        out int electionCode)
+    public static bool TryParseYear(string unitKey, string stage, out int year)
     {
-        stage = string.Empty;
         year = 0;
-        state = string.Empty;
-        round = 0;
-        electionCode = 0;
 
         var parts = unitKey.Split(Separator);
 
-        if (parts.Length != 5)
+        return parts.Length == 2
+               && parts[0] == stage
+               && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out year);
+    }
+
+    public static bool TryParseResults(string unitKey, out int year, out string state)
+    {
+        year = 0;
+        state = string.Empty;
+
+        var parts = unitKey.Split(Separator);
+
+        if (parts.Length != 3 || parts[0] != ResultsStage)
             return false;
 
         if (!int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out year))
             return false;
 
-        if (!short.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out round))
-            return false;
-
-        if (!int.TryParse(parts[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out electionCode))
-            return false;
-
-        stage = parts[0];
         state = parts[2];
 
         return true;
@@ -68,4 +66,24 @@ public static class TseImport
         => unitKey.StartsWith(ReferenceStage, StringComparison.Ordinal)
            || unitKey.StartsWith(CandidatesStage, StringComparison.Ordinal)
            || unitKey.StartsWith(ResultsStage, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Detects the retired five-part key format (<c>Stage:Year:State:Round:ElectionCode</c>)
+    /// that an earlier planner emitted.
+    /// </summary>
+    /// <remarks>
+    /// Rows created by that planner still exist in deployed databases. They are not silently
+    /// accepted or reclassified: the caller reports them as invalid so an operator can remove
+    /// them, because rewriting an old key into the new format would guess at its intent.
+    /// </remarks>
+    public static bool IsLegacyKey(string unitKey)
+        => IsTseUnitKey(unitKey) && unitKey.Split(Separator).Length > 3;
+
+    /// <summary>
+    /// Human-readable reason a key was rejected, used in failure messages.
+    /// </summary>
+    public static string DescribeInvalidKey(string unitKey)
+        => IsLegacyKey(unitKey)
+            ? $"'{unitKey}' uses the retired five-part work-unit key format; delete work units created before the current planner and re-run the import."
+            : $"'{unitKey}' does not match the '{CandidatesStage}:<year>' or '{ResultsStage}:<year>:<state>' format.";
 }

@@ -1,5 +1,6 @@
 using Bravo.Application.Importing.Contracts;
 using Bravo.Domain.Importing.Entities;
+using Bravo.Domain.Importing.Enums;
 using Dapper;
 using Npgsql;
 
@@ -24,7 +25,7 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
                   FROM "ImportWorkUnits" AS previous
                   WHERE previous."JobId" = unit."JobId"
                     AND (previous."CreatedAt", previous."Id") < (unit."CreatedAt", unit."Id")
-                    AND previous."Status" <> 'Completed'
+                    AND previous."Status" IN ('Pending', 'Running')
               )
             ORDER BY unit."CreatedAt", unit."Id"
             FOR UPDATE OF unit SKIP LOCKED
@@ -32,6 +33,7 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
         )
         UPDATE "ImportWorkUnits" AS unit
         SET "Status" = 'Running',
+            "Stage" = 'Initializing',
             "LeaseOwner" = @WorkerId,
             "LeaseExpiresAt" = now() + make_interval(secs => @LeaseSeconds),
             "FencingToken" = unit."FencingToken" + 1,
@@ -69,6 +71,7 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
     private const string FailWorkUnitSql = """
         UPDATE "ImportWorkUnits"
         SET "Status" = 'Failed',
+            "Stage" = 'Failed',
             "LeaseOwner" = NULL,
             "LeaseExpiresAt" = NULL,
             "CompletedAt" = now(),
@@ -83,6 +86,7 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
     private const string ReleaseWorkUnitSql = """
         UPDATE "ImportWorkUnits"
         SET "Status" = 'Pending',
+            "Stage" = 'Pending',
             "LeaseOwner" = NULL,
             "LeaseExpiresAt" = NULL,
             "NextAttemptAt" = NULL,
@@ -98,6 +102,7 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
         WITH completed AS (
             UPDATE "ImportWorkUnits"
             SET "Status" = 'Completed',
+                "Stage" = 'Completed',
                 "LeaseOwner" = NULL,
                 "LeaseExpiresAt" = NULL,
                 "NextAttemptAt" = NULL,
@@ -113,6 +118,21 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
         FROM completed
         WHERE job."Id" = completed."JobId"
         RETURNING job."Id";
+        """;
+
+    private const string ReportProgressSql = """
+        UPDATE "ImportWorkUnits"
+        SET "Stage" = @Stage,
+            "ProcessedRecords" = @ProcessedRecords,
+            "InsertedRecords" = @InsertedRecords,
+            "UpdatedRecords" = @UpdatedRecords,
+            "RejectedRecords" = @RejectedRecords,
+            "TotalRecords" = COALESCE(@TotalRecords, "TotalRecords"),
+            "ProgressUpdatedAt" = now(),
+            "UpdatedAt" = now()
+        WHERE "Id" = @WorkUnitId
+          AND "FencingToken" = @FencingToken
+          AND "Status" = 'Running';
         """;
 
     private const string SelectJobIdSql = """
@@ -272,6 +292,37 @@ internal sealed class ImportWorkUnitRepository(NpgsqlDataSource dataSource) : II
         var affected = await connection.ExecuteAsync(new CommandDefinition(
             ReleaseWorkUnitSql,
             new { WorkUnitId = workUnitId, WorkerId = workerId, FencingToken = fencingToken, Reason = reason },
+            cancellationToken: cancellationToken));
+
+        return affected > 0;
+    }
+
+    public async Task<bool> ReportProgressAsync(
+        Guid workUnitId,
+        long fencingToken,
+        ImportStage stage,
+        long processedRecords,
+        long insertedRecords,
+        long updatedRecords,
+        long rejectedRecords,
+        long? totalRecords,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            ReportProgressSql,
+            new
+            {
+                WorkUnitId = workUnitId,
+                FencingToken = fencingToken,
+                Stage = stage.ToString(),
+                ProcessedRecords = processedRecords,
+                InsertedRecords = insertedRecords,
+                UpdatedRecords = updatedRecords,
+                RejectedRecords = rejectedRecords,
+                TotalRecords = totalRecords
+            },
             cancellationToken: cancellationToken));
 
         return affected > 0;

@@ -21,14 +21,14 @@ public sealed class TseVoteClassifierTests
     [Fact]
     public void SentinelCodeIsNeverTreatedAsCandidate()
     {
-        TseVoteClassifier.Classify(95, candidateSequential: 12345).Should().Be(VoteType.Blank);
-        TseVoteClassifier.Classify(96, candidateSequential: 12345).Should().Be(VoteType.Null);
+        TseVoteClassifier.Classify(95, candidateSequential: "12345").Should().Be(VoteType.Blank);
+        TseVoteClassifier.Classify(96, candidateSequential: "12345").Should().Be(VoteType.Null);
     }
 
     [Fact]
     public void BallotWithCandidateSequentialIsNominal()
     {
-        TseVoteClassifier.Classify(50510, 10001595357).Should().Be(VoteType.Nominal);
+        TseVoteClassifier.Classify(50510, "10001595357").Should().Be(VoteType.Nominal);
     }
 
     [Fact]

@@ -6,5 +6,6 @@ public interface IElectionResultRepository
 {
     Task<int> UpsertResultsAsync(
         IReadOnlyCollection<ElectionResult> results,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

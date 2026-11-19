@@ -1,4 +1,5 @@
 using Bravo.Domain.Importing.Entities;
+using Bravo.Domain.Importing.Enums;
 
 namespace Bravo.Application.Importing.Contracts;
 
@@ -44,6 +45,21 @@ public interface IImportWorkUnitRepository
     Task<bool> CompleteAsync(
         Guid workUnitId,
         long fencingToken,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Persists a progress snapshot for the unit. Fenced, so a unit that lost ownership
+    /// cannot overwrite another worker's counters.
+    /// </summary>
+    Task<bool> ReportProgressAsync(
+        Guid workUnitId,
+        long fencingToken,
+        ImportStage stage,
+        long processedRecords,
+        long insertedRecords,
+        long updatedRecords,
+        long rejectedRecords,
+        long? totalRecords,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ImportWorkUnit>> GetByJobAsync(

@@ -1,8 +1,11 @@
 using Bravo.Application.Extensions;
 using Bravo.Infrastructure.Email.Extensions;
 using Bravo.Presentation.Extensions;
+using Bravo.Presentation.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.AddRollingFile(builder.Configuration);
 
 builder.Services.AddDatabase(builder.Configuration)
                 .AddSecurity(builder.Configuration)

@@ -16,7 +16,7 @@ public static class TseVoteClassifier
     public const int BlankVoteCode = 95;
     public const int NullVoteCode = 96;
 
-    public static VoteType Classify(int ballotNumber, long? candidateSequential)
+    public static VoteType Classify(int ballotNumber, string? candidateSequential)
     {
         if (ballotNumber == BlankVoteCode)
             return VoteType.Blank;
@@ -24,7 +24,7 @@ public static class TseVoteClassifier
         if (ballotNumber == NullVoteCode)
             return VoteType.Null;
 
-        if (candidateSequential is not null)
+        if (!string.IsNullOrWhiteSpace(candidateSequential))
             return VoteType.Nominal;
 
         // Remaining ballots without a candidate sequential are party/legend votes.

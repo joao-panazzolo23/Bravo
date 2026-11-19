@@ -15,7 +15,9 @@ public sealed class TseReferenceReader : ITseReferenceReader
 
         var layout = CandidateLayouts.Get(layoutVersion);
 
-        TseElectionReference? election = null;
+        // A single candidate file can contain several elections and both rounds, so every
+        // distinct (election code, round) pair is retained rather than just the first row.
+        var elections = new Dictionary<(int Code, short Round), TseElectionReference>();
         var offices = new Dictionary<int, TseOfficeReference>();
         var parties = new Dictionary<(int, string), TsePartyReference>();
         var federations = new Dictionary<int, TseFederationReference>();
@@ -24,13 +26,16 @@ public sealed class TseReferenceReader : ITseReferenceReader
         {
             var values = record.Values;
 
-            election ??= new TseElectionReference(
+            var election = new TseElectionReference(
                 TseValues.ParseInt(values[Canonical.ElectionCode]),
                 TseValues.ParseInt(values[Canonical.Year]),
                 TseValues.ParseInt(values[Canonical.ElectionTypeCode]),
                 values[Canonical.ElectionTypeName],
                 values[Canonical.ElectionDescription],
-                TseValues.ParseNullableDate(values[Canonical.ElectionDate]));
+                TseValues.ParseNullableDate(values[Canonical.ElectionDate]),
+                (short)TseValues.ParseInt(values[Canonical.Round]));
+
+            elections[(election.Code, election.Round)] = election;
 
             var office = new TseOfficeReference(
                 TseValues.ParseInt(values[Canonical.OfficeCode]),
@@ -62,7 +67,7 @@ public sealed class TseReferenceReader : ITseReferenceReader
         }
 
         return new TseReferenceSnapshot(
-            election,
+            elections.Values.OrderBy(e => e.Code).ThenBy(e => e.Round).ToArray(),
             offices.Values.OrderBy(office => office.Code).ToArray(),
             parties.Values.OrderBy(party => party.Number).ThenBy(party => party.Acronym).ToArray(),
             federations.Values.OrderBy(federation => federation.Number).ToArray());

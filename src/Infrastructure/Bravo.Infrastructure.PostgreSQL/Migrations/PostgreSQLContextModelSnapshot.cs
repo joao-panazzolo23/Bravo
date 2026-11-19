@@ -198,8 +198,10 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Property<Guid>("StateId")
                         .HasColumnType("uuid");
 
-                    b.Property<long>("TseCandidateSequential")
-                        .HasColumnType("bigint");
+                    b.Property<string>("TseCandidateSequential")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -223,10 +225,10 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
                     b.HasIndex("StateId");
 
-                    b.HasIndex("ElectionId", "TseCandidateSequential")
-                        .IsUnique();
-
                     b.HasIndex("ElectionId", "OfficeId", "StateId");
+
+                    b.HasIndex("ElectionId", "StateId", "OfficeId", "TseCandidateSequential", "BallotNumber", "Name")
+                        .IsUnique();
 
                     b.ToTable("Candidates", (string)null);
                 });
@@ -848,8 +850,8 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
                     b.Property<string>("Abbreviation")
                         .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1113,6 +1115,9 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Property<long>("FencingToken")
                         .HasColumnType("bigint");
 
+                    b.Property<long>("InsertedRecords")
+                        .HasColumnType("bigint");
+
                     b.Property<Guid>("JobId")
                         .HasColumnType("uuid");
 
@@ -1132,6 +1137,17 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Property<long>("ProcessedRecords")
                         .HasColumnType("bigint");
 
+                    b.Property<DateTime?>("ProgressUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("RejectedRecords")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1140,6 +1156,9 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<long?>("TotalRecords")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("UnitKey")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1147,6 +1166,9 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("UpdatedRecords")
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 

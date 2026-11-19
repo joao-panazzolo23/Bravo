@@ -652,6 +652,52 @@ However, it may depend on geographic records already imported from IBGE when est
 Derived from the confirmed layouts. Each stage is independently shippable and follows the
 existing `IImportSource<T>` → `ImportBatchPipeline<T>` → `IImportBatchStore<T>` pattern.
 
+#### 6.1.0. Verified dataset catalog (2026-11-16)
+
+Probed against `cdn.tse.jus.br` to define what "all elections" means in practice.
+
+| Fact | Verified value |
+| --- | --- |
+| `consulta_cand_{year}.zip` exists | 1994–2026, every 2-year cycle (17 archives) |
+| `votacao_secao_{year}_{UF}.zip` exists | 1998–2026 (1994 and 1996 return 404) |
+| Candidate archive layout | **one entry per UF inside a single year archive** |
+| Results archive layout | **one archive per (year, UF)** |
+| Exterior (`ZZ`) | present only in 2026; 2014/2018/2022 return 404 |
+| `BR` results file | nationwide **presidential** results, contains **all UFs including `ZZ`** |
+| Rounds | **both rounds live in the same file**, distinguished by `CD_ELEICAO` (`544` = round 1, `545` = round 2 for 2022) |
+| `NR_TURNO` | matches the round, but `CD_ELEICAO` is the authoritative round identifier |
+
+Consequences for the importer:
+
+1. A single import must enumerate **every available year**, not a caller-supplied one.
+   `POST /api/v1/import/tse` takes no filters and schedules 454 work units
+   (17 years x reference+candidates, 15 years x 28 scopes).
+
+> **Scope tokens verified.** Candidate archives contain 29 entries: 27 states plus `BR`
+> (national offices) and `BRASIL` (presidential). `ZZ` (exterior) appears only from 2026.
+> IBGE publishes only 27 states, so `BR`, `BRASIL` and `ZZ` are seeded as synthetic state
+> rows with negative IBGE codes (-1/-2/-3) that real codes (11-53) cannot occupy.
+>
+> **Verified source-data defects (all handled, none abort an import):**
+> - `00/00/1900` placeholder dates in 1998.
+> - Corrupt birth date `15/64/6514` in 1998/RJ.
+> - `SQ_CANDIDATO` is not always numeric (`15/64/6514` appears in 1998/RJ and 1998/BRASIL),
+>   so it is stored as text.
+> - `SQ_CANDIDATO` is not unique per election in 2000 (two candidates share `SQ 62`), so the
+>   candidate unique key is `(Election, State, Office, Sequential, BallotNumber, Name)`.
+> - `NM_URNA_CANDIDATO` is blank in 2000; it falls back to the full candidate name.
+> - Party acronym casing drifts (`PC do B` vs `PC DO B`); lookups are case-insensitive.
+> - A `Failed` work unit must not block later units; the claim query now only waits on
+>   `Pending`/`Running` predecessors.
+2. Within a year, candidates must be imported for **every UF present in the archive**,
+   discovered from the archive listing rather than a hardcoded list.
+3. Results must be imported per `(year, UF)` archive. The `ZZ` exterior scope is imported
+   whenever the archive exists; the `BR` file supplies presidential results and must not be
+   double-counted against the same sections from a UF file.
+4. Round is derived per row from `CD_ELEICAO`, so a single file populates multiple
+   `ElectionRound` rows. The earlier assumption that "a second turn arrives as a separate
+   file" was wrong and is corrected here.
+
 - [x] **Stage 1 — TSE acquisition layer.** Complete and verified:
       project `src/Infrastructure/Bravo.Infrastructure.Tse`; HTTP client with timeout and
       cancellation; streaming ZIP download with size cap; configurable concurrency rate

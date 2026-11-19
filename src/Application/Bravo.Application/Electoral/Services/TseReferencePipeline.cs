@@ -1,17 +1,22 @@
 using Bravo.Application.Electoral.Contracts;
+using Bravo.Application.Electoral.Models;
 using Bravo.Application.Importing;
 using Bravo.Application.Importing.Contracts;
 using Bravo.Application.Importing.Exceptions;
+using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Importing.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Electoral.Services;
 
 /// <summary>
-/// Imports election, round, office, party and federation reference data from the TSE
-/// candidate archive. Reference values are denormalised on every candidate row, so this
-/// stage reads the candidate file and must run before the candidates stage.
+/// Imports elections, rounds, offices, parties and federations by reading every state file in
+/// the candidate archive for a year.
 /// </summary>
+/// <remarks>
+/// Reference values are denormalised per candidate row, so this stage reads the same archive
+/// as the candidates stage. It runs first because candidates need the reference rows.
+/// </remarks>
 public sealed class TseReferencePipeline(
     ITseDatasetAcquirer acquirer,
     ITseReferenceReader reader,
@@ -26,58 +31,74 @@ public sealed class TseReferencePipeline(
         ImportWorkUnit workUnit,
         CancellationToken cancellationToken = default)
     {
-        var scope = TseImportScope.Parse(workUnit.UnitKey);
+        if (!TseImport.TryParseYear(workUnit.UnitKey, TseImport.ReferenceStage, out var year))
+            throw new ImportPermanentException(TseImport.DescribeInvalidKey(workUnit.UnitKey));
 
-        var dataset = await acquirer.AcquireCandidatesAsync(scope, cancellationToken);
+        var files = await acquirer.AcquireCandidatesAsync(year, cancellationToken);
 
-        await using var stream = File.OpenRead(dataset.FilePath);
+        if (files.Count == 0)
+            throw new ImportPermanentException($"The {year} candidate archive contains no state files.");
 
-        var snapshot = reader.Read(stream, dataset.LayoutVersion);
+        var offices = new Dictionary<int, TseOfficeReference>();
+        var parties = new Dictionary<(int, string), TsePartyReference>();
+        var federations = new Dictionary<int, TseFederationReference>();
+        var seenElections = new HashSet<(int Code, short Round)>();
 
-        if (snapshot.Election is null)
-            throw new ImportPermanentException("The TSE candidate file contains no election rows.");
+        foreach (var file in files)
+        {
+            await using var stream = File.OpenRead(file.Dataset.FilePath);
 
-        var election = await elections.UpsertAsync(
-            Domain.Electoral.Entities.Election.Create(
-                snapshot.Election.Code,
-                snapshot.Election.Year,
-                snapshot.Election.TypeCode,
-                snapshot.Election.TypeName,
-                snapshot.Election.Description,
-                snapshot.Election.Date),
-            cancellationToken);
+            var snapshot = reader.Read(stream, file.Dataset.LayoutVersion);
 
-        var roundName = scope.Round == 1 ? "1º turno" : $"{scope.Round}º turno";
+            foreach (var electionRow in snapshot.Elections)
+            {
+                if (!seenElections.Add((electionRow.Code, electionRow.Round)))
+                    continue;
 
-        await elections.UpsertRoundAsync(
-            Domain.Electoral.Entities.ElectionRound.Create(election.Id, scope.Round, roundName),
-            cancellationToken);
+                await UpsertElectionAsync(electionRow, cancellationToken);
+            }
+
+            foreach (var office in snapshot.Offices)
+                offices[office.Code] = office;
+
+            foreach (var party in snapshot.Parties)
+                parties[(party.Number, party.Acronym)] = party;
+
+            foreach (var federation in snapshot.Federations)
+                federations[federation.Number] = federation;
+        }
 
         await reference.UpsertOfficesAsync(
-            snapshot.Offices
-                .Select(row => Domain.Electoral.Entities.ElectoralOffice.Create(row.Code, row.Name))
-                .ToArray(),
+            offices.Values.Select(row => ElectoralOffice.Create(row.Code, row.Name)).ToArray(),
             cancellationToken);
 
         await reference.UpsertPartiesAsync(
-            snapshot.Parties
-                .Select(row => Domain.Electoral.Entities.PoliticalParty.Create(row.Number, row.Acronym, row.Name))
-                .ToArray(),
+            parties.Values.Select(row => PoliticalParty.Create(row.Number, row.Acronym, row.Name)).ToArray(),
             cancellationToken);
 
         await reference.UpsertFederationsAsync(
-            snapshot.Federations
-                .Select(row => Domain.Electoral.Entities.Federation.Create(row.Number, row.Name, row.Acronym, row.Composition))
+            federations.Values
+                .Select(row => Federation.Create(row.Number, row.Name, row.Acronym, row.Composition))
                 .ToArray(),
             cancellationToken);
 
         logger.LogInformation(
-            "Imported TSE reference data for {Year}/{State} round {Round}: {Offices} offices, {Parties} parties, {Federations} federations.",
-            scope.Year,
-            scope.State,
-            scope.Round,
-            snapshot.Offices.Count,
-            snapshot.Parties.Count,
-            snapshot.Federations.Count);
+            "Imported {Year} reference data: {Elections} election rounds, {Offices} offices, {Parties} parties, {Federations} federations.",
+            year, seenElections.Count, offices.Count, parties.Count, federations.Count);
+    }
+
+    private async Task UpsertElectionAsync(
+        TseElectionReference row,
+        CancellationToken cancellationToken)
+    {
+        var election = await elections.UpsertAsync(
+            Election.Create(row.Code, row.Year, row.TypeCode, row.TypeName, row.Description, row.Date),
+            cancellationToken);
+
+        var roundName = row.Round == 1 ? "1º turno" : $"{row.Round}º turno";
+
+        await elections.UpsertRoundAsync(
+            ElectionRound.Create(election.Id, row.Round, roundName),
+            cancellationToken);
     }
 }

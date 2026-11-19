@@ -24,5 +24,6 @@ public interface IDatasetVersionRepository
     /// </summary>
     Task<bool> ActivateAsync(
         Guid id,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

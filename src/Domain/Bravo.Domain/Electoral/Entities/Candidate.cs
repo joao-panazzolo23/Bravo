@@ -12,7 +12,7 @@ public class Candidate : Entity
     public Guid OfficeId { get; private set; }
     public Guid StateId { get; private set; }
     public Guid? CandidateIdentityId { get; private set; }
-    public long TseCandidateSequential { get; private set; }
+    public string TseCandidateSequential { get; private set; } = string.Empty;
     public int BallotNumber { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string UrnName { get; private set; } = string.Empty;
@@ -34,7 +34,7 @@ public class Candidate : Entity
         Guid officeId,
         Guid stateId,
         Guid? candidateIdentityId,
-        long tseCandidateSequential,
+        string tseCandidateSequential,
         int ballotNumber,
         string name,
         string urnName,
@@ -50,7 +50,10 @@ public class Candidate : Entity
         DateOnly? birthDate)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(urnName);
+
+        // TSE leaves the urn name blank for some historical candidacies (verified in 2000),
+        // so it falls back to the full name rather than rejecting a valid registration.
+        var effectiveUrnName = string.IsNullOrWhiteSpace(urnName) ? name : urnName;
 
         var candidate = new Candidate
         {
@@ -61,7 +64,7 @@ public class Candidate : Entity
             TseCandidateSequential = tseCandidateSequential,
             BallotNumber = ballotNumber,
             Name = name,
-            UrnName = urnName,
+            UrnName = effectiveUrnName,
             SocialName = socialName,
             PartyId = partyId,
             FederationId = federationId,

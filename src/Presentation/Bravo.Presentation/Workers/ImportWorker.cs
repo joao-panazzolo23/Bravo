@@ -68,7 +68,16 @@ public sealed class ImportWorker(
                 continue;
 
             if (!await _slots.WaitAsync(0, cancellationToken))
+            {
+                logger.LogDebug(
+                    "Worker {WorkerId} is at capacity; {RunningJobs} job(s) in flight.",
+                    _workerId, _running.Count);
                 break;
+            }
+
+            logger.LogInformation(
+                "Worker {WorkerId} dispatching import job {JobId}. RunningJobs: {RunningJobs}.",
+                _workerId, jobId, _running.Count + 1);
 
             var task = RunJobAsync(jobId, cancellationToken);
             _running[jobId] = task;

@@ -5,11 +5,11 @@ using Mediator;
 
 namespace Bravo.Application.Importing.Commands;
 
+/// <summary>
+/// Triggers the full TSE electoral import: every year TSE publishes, every state, every
+/// round. There are intentionally no filters — this is an unbounded historical import.
+/// </summary>
 public sealed record StartTseImportCommand(
-    int Year,
-    string State,
-    short Round,
-    int ElectionCode,
     int? BatchSize = null,
     int? MaxAttempts = null,
     int? LeaseDurationSeconds = null)

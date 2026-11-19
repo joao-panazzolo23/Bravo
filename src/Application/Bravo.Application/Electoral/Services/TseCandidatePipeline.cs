@@ -3,16 +3,22 @@ using Bravo.Application.Electoral.Models;
 using Bravo.Application.Importing;
 using Bravo.Application.Importing.Contracts;
 using Bravo.Application.Importing.Exceptions;
+using Bravo.Application.Importing.Services;
 using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Importing.Entities;
+using Bravo.Domain.Importing.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Electoral.Services;
 
 /// <summary>
-/// Imports election-specific candidate registrations (candidacies), keeping permanent
-/// identity (CPF-keyed) separate from the registration row.
+/// Imports every election-specific candidate registration for a year, across every state
+/// present in the archive.
 /// </summary>
+/// <remarks>
+/// Permanent identity (CPF-keyed) is separated from the registration row. The round is taken
+/// from each row's election code, so a file that contains both rounds is handled correctly.
+/// </remarks>
 public sealed class TseCandidatePipeline(
     ITseDatasetAcquirer acquirer,
     ITseCandidateReader reader,
@@ -20,9 +26,14 @@ public sealed class TseCandidatePipeline(
     IElectoralReferenceRepository reference,
     ICoalitionRepository coalitions,
     ICandidateRepository candidates,
-    IGeographyLookup geography,
-    ILogger<TseCandidatePipeline> logger) : IImportPipeline
+    IGeographyRepository geography,
+    TseSyntheticScopeSeeder syntheticScopes,
+    ImportProgressReporterFactory progressFactory,
+    ILogger<TseCandidatePipeline> logger
+) : IImportPipeline
 {
+    private const int BatchSize = 5_000;
+
     public string UnitKey => TseImport.CandidatesStage;
 
     public async Task ProcessAsync(
@@ -30,105 +41,195 @@ public sealed class TseCandidatePipeline(
         ImportWorkUnit workUnit,
         CancellationToken cancellationToken = default)
     {
-        var scope = TseImportScope.Parse(workUnit.UnitKey);
+        if (!TseImport.TryParseYear(workUnit.UnitKey, TseImport.CandidatesStage, out var year))
+            throw new ImportPermanentException(TseImport.DescribeInvalidKey(workUnit.UnitKey));
 
-        var dataset = await acquirer.AcquireCandidatesAsync(scope, cancellationToken);
+        using var unitScope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Dataset"] = TseImport.CandidatesStage,
+            ["ElectionYear"] = year
+        });
 
-        await using var stream = File.OpenRead(dataset.FilePath);
+        var progress = progressFactory.Create(job, workUnit);
 
-        var rows = reader.Read(stream, dataset.LayoutVersion);
+        await progress.StageAsync(ImportStage.Downloading, cancellationToken);
+        logger.LogInformation(
+            "Downloading candidate dataset. Dataset: {Dataset}, ElectionYear: {Year}.",
+            TseImport.CandidatesStage, year);
 
-        if (rows.Count == 0)
-            return;
+        var files = await acquirer.AcquireCandidatesAsync(year, cancellationToken);
 
-        var election = await elections.FindByCodeAsync(scope.ElectionCode, cancellationToken)
-            ?? throw new ImportPermanentException(
-                $"Election {scope.ElectionCode} is not imported; run the reference stage first.");
+        if (files.Count == 0)
+            throw new ImportPermanentException($"The {year} candidate archive contains no state files.");
 
-        var round = await elections.FindRoundAsync(election.Id, scope.Round, cancellationToken)
-            ?? throw new ImportPermanentException(
-                $"Round {scope.Round} for election {scope.Year} is not imported; run the reference stage first.");
+        await progress.StageAsync(ImportStage.Reading, cancellationToken);
 
         var stateIds = await geography.GetStateIdsByAcronymAsync(cancellationToken);
-
-        if (!stateIds.TryGetValue(scope.State, out var stateId))
-            throw new ImportPermanentException(
-                $"State '{scope.State}' is not present; import IBGE states first.");
-
         var officeIds = await reference.GetOfficeIdsAsync(cancellationToken);
         var partyIds = await reference.GetPartyIdsAsync(cancellationToken);
         var federationIds = await reference.GetFederationIdsAsync(cancellationToken);
 
-        var importedCoalitions = await UpsertCoalitionsAsync(rows, round, stateId, officeIds, cancellationToken);
-        var coalitionIds = importedCoalitions.Count == 0
-            ? await coalitions.GetIdsAsync(cancellationToken)
-            : importedCoalitions;
-
         var identities = new Dictionary<string, Guid>(StringComparer.Ordinal);
-        var registrations = new List<Candidate>(rows.Count);
+        var total = 0;
 
-        foreach (var row in rows)
+        foreach (var file in files)
         {
-            var officeId = Resolve(officeIds, row.OfficeCode, $"office {row.OfficeCode}");
+            var stateId = await ResolveStateIdAsync(file.StateAcronym, stateIds, cancellationToken);
 
-            var partyKey = (row.PartyNumber, row.PartyAcronym);
-
-            if (!partyIds.TryGetValue(partyKey, out var partyId))
-                throw new ImportPermanentException($"Party {row.PartyNumber}/{row.PartyAcronym} is not imported.");
-
-            Guid? federationId = null;
-
-            if (row.FederationNumber is > 0 and var federationNumber)
+            if (stateId is null)
             {
-                if (federationIds.TryGetValue(federationNumber, out var resolved))
-                    federationId = resolved;
+                logger.LogWarning(
+                    "Skipping {Year}/{State}: no geography row could be resolved.",
+                    year, file.StateAcronym);
+
+                continue;
             }
 
-            Guid? coalitionId = null;
+            await using var stream = File.OpenRead(file.Dataset.FilePath);
 
-            if (row.HasCoalition
-                && row.CoalitionNumber is { } coalitionNumber
-                && coalitionIds.TryGetValue((round.Id, officeId, coalitionNumber), out var resolvedCoalition))
-            {
-                coalitionId = resolvedCoalition;
-            }
+            var rows = reader.Read(stream, file.Dataset.LayoutVersion);
 
-            var identityId = await ResolveIdentityAsync(row, identities, cancellationToken);
-
-            registrations.Add(Candidate.Create(
-                election.Id,
-                officeId,
-                stateId,
-                identityId,
-                row.Sequential,
-                row.BallotNumber,
-                row.Name,
-                row.UrnName,
-                row.SocialName,
-                partyId,
-                federationId,
-                coalitionId,
-                row.RegistrationStatus,
-                row.Gender,
-                row.Education,
-                row.Race,
-                row.Occupation,
-                row.BirthDate));
+            total += await ImportFileAsync(
+                year,
+                file.StateAcronym,
+                stateId.Value,
+                rows,
+                officeIds,
+                partyIds,
+                federationIds,
+                identities,
+                progress,
+                total,
+                cancellationToken);
         }
 
-        await candidates.UpsertCandidatesAsync(registrations, cancellationToken);
+        await progress.FlushAsync(cancellationToken);
 
         logger.LogInformation(
-            "Imported {Count} candidate registrations for {Year}/{State} round {Round}.",
-            registrations.Count,
-            scope.Year,
-            scope.State,
-            scope.Round);
+            "Imported {Count} candidate registrations for {Year} across {States} state files.",
+            total, year, files.Count
+        );
+    }
+
+    private async Task<int> ImportFileAsync(
+        int year,
+        string stateAcronym,
+        Guid stateId,
+        IReadOnlyList<TseCandidateRow> rows,
+        IReadOnlyDictionary<int, Guid> officeIds,
+        IReadOnlyDictionary<(int Number, string Acronym), Guid> partyIds,
+        IReadOnlyDictionary<int, Guid> federationIds,
+        Dictionary<string, Guid> identities,
+        IImportProgressReporter progress,
+        int alreadyImported,
+        CancellationToken cancellationToken)
+    {
+        var imported = 0;
+        var byElection = rows
+            .GroupBy(row => (row.ElectionCode, row.Round))
+            .ToArray();
+
+        foreach (var group in byElection)
+        {
+            var election = await elections.FindByCodeAsync(group.Key.ElectionCode, cancellationToken);
+
+            if (election is null)
+                continue;
+
+            var round = await elections.FindRoundAsync(election.Id, group.Key.Round, cancellationToken);
+
+            if (round is null)
+                continue;
+
+            var coalitionIds = await UpsertCoalitionsAsync(
+                group.ToArray(), round.Id, stateId, officeIds, cancellationToken);
+
+            // The same candidate sequential can appear more than once in a file (for example
+            // when a candidacy has multiple rows); the upsert key is (election, sequential), so
+            // duplicates within one command must be collapsed first.
+            var buffer = new Dictionary<(string Seq, int Ballot, string Name), Candidate>(BatchSize);
+
+            foreach (var row in group)
+            {
+                var officeId = Resolve(officeIds, row.OfficeCode, $"office {row.OfficeCode}");
+
+                if (!partyIds.TryGetValue((row.PartyNumber, row.PartyAcronym.ToUpperInvariant()), out var partyId))
+                    throw new ImportPermanentException(
+                        $"Party {row.PartyNumber}/{row.PartyAcronym} is not imported.");
+
+                Guid? federationId = null;
+
+                if (row.FederationNumber is > 0 and var federationNumber
+                    && federationIds.TryGetValue(federationNumber, out var resolvedFederation))
+                {
+                    federationId = resolvedFederation;
+                }
+
+                Guid? coalitionId = null;
+
+                if (row.HasCoalition
+                    && row.CoalitionNumber is { } coalitionNumber
+                    && coalitionIds.TryGetValue((round.Id, officeId, coalitionNumber), out var resolvedCoalition))
+                {
+                    coalitionId = resolvedCoalition;
+                }
+
+                var identityId = await ResolveIdentityAsync(row, identities, cancellationToken);
+
+                var candidate = Candidate.Create(
+                    election.Id,
+                    officeId,
+                    stateId,
+                    identityId,
+                    row.Sequential,
+                    row.BallotNumber,
+                    row.Name,
+                    row.UrnName,
+                    row.SocialName,
+                    partyId,
+                    federationId,
+                    coalitionId,
+                    row.RegistrationStatus,
+                    row.Gender,
+                    row.Education,
+                    row.Race,
+                    row.Occupation,
+                    row.BirthDate);
+
+                buffer[(row.Sequential, row.BallotNumber, row.Name)] = candidate;
+
+                if (buffer.Count >= BatchSize)
+                {
+                    await progress.StageAsync(ImportStage.Persisting, cancellationToken);
+
+                    await candidates.UpsertCandidatesAsync(buffer.Values.ToArray(), cancellationToken);
+
+                    imported += buffer.Count;
+
+                    await progress.RecordsAsync(
+                        alreadyImported + imported,
+                        alreadyImported + imported,
+                        0,
+                        0,
+                        cancellationToken: cancellationToken);
+
+                    buffer.Clear();
+                }
+            }
+
+            if (buffer.Count > 0)
+            {
+                await candidates.UpsertCandidatesAsync(buffer.Values.ToArray(), cancellationToken);
+                imported += buffer.Count;
+            }
+        }
+
+        return imported;
     }
 
     private async Task<IReadOnlyDictionary<(Guid, Guid, long), Guid>> UpsertCoalitionsAsync(
         IReadOnlyList<TseCandidateRow> rows,
-        ElectionRound round,
+        Guid roundId,
         Guid stateId,
         IReadOnlyDictionary<int, Guid> officeIds,
         CancellationToken cancellationToken)
@@ -149,7 +250,7 @@ public sealed class TseCandidatePipeline(
             var officeId = Resolve(officeIds, row.OfficeCode, $"office {row.OfficeCode}");
 
             entities.Add(Coalition.Create(
-                round.Id,
+                roundId,
                 officeId,
                 stateId,
                 row.CoalitionNumber!.Value,
@@ -186,4 +287,25 @@ public sealed class TseCandidatePipeline(
         => map.TryGetValue(key, out var id)
             ? id
             : throw new ImportPermanentException($"{description} is not imported.");
+
+    /// <summary>
+    /// Resolves a TSE scope to a state row, creating the synthetic national/exterior rows on
+    /// demand because IBGE only publishes the 27 states.
+    /// </summary>
+    private async Task<Guid?> ResolveStateIdAsync(
+        string scope,
+        IReadOnlyDictionary<string, Guid> stateIds,
+        CancellationToken cancellationToken)
+    {
+        if (stateIds.TryGetValue(scope, out var existing))
+            return existing;
+
+        if (!TseScopes.IsSynthetic(scope))
+            return null;
+
+        return await syntheticScopes.EnsureAsync(
+            scope,
+            geography.UpsertStatesAsync,
+            cancellationToken);
+    }
 }

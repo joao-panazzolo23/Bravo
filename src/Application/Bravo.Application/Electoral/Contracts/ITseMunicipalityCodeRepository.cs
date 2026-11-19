@@ -10,5 +10,6 @@ public interface ITseMunicipalityCodeRepository
 
     Task<IReadOnlyDictionary<string, Guid?>> GetResolvedAsync(
         int electionYear,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

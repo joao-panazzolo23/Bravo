@@ -44,6 +44,16 @@ public class ImportController(IMediator mediator) : ControllerBase
         return StatusCode(response.StatusCode, response);
     }
 
+    [HttpGet("{id:guid}/progress")]
+    // [Authorize(Roles = AuthorizationRoles.Administrators)]
+    public async Task<ActionResult<Result<ImportJobProgressViewModel?>>> GetProgress(
+        [FromRoute] Guid id
+    )
+    {
+        var response = await mediator.Send(new GetImportJobProgressQuery(id));
+        return StatusCode(response.StatusCode, response);
+    }
+
     [HttpGet("{id:guid}/failures")]
     // [Authorize(Roles = AuthorizationRoles.Administrators)]
     public async Task<ActionResult<Result<IReadOnlyList<ImportFailedRecordViewModel>>>> GetFailures(

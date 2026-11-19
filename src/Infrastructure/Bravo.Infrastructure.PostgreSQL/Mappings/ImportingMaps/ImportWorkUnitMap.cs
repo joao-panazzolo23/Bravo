@@ -35,6 +35,17 @@ internal sealed class ImportWorkUnitMap : EntityMapper<ImportWorkUnit>
         builder.Property(x => x.AttemptCount).IsRequired();
         builder.Property(x => x.FencingToken).IsRequired();
 
+        builder.Property(x => x.Stage)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .IsRequired();
+
+        builder.Property(x => x.InsertedRecords).IsRequired();
+        builder.Property(x => x.UpdatedRecords).IsRequired();
+        builder.Property(x => x.RejectedRecords).IsRequired();
+        builder.Property(x => x.TotalRecords);
+        builder.Property(x => x.ProgressUpdatedAt);
+
         builder.HasIndex(x => new { x.JobId, x.UnitKey })
             .IsUnique();
 

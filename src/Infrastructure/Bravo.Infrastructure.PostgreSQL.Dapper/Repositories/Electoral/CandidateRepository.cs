@@ -38,13 +38,14 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
             record."Occupation", record."BirthDate", record."CreatedAt", record."UpdatedAt"
         FROM jsonb_to_recordset(@Records::jsonb) AS record(
             "Id" uuid, "ElectionId" uuid, "OfficeId" uuid, "StateId" uuid,
-            "CandidateIdentityId" uuid, "TseCandidateSequential" bigint, "BallotNumber" integer,
+            "CandidateIdentityId" uuid, "TseCandidateSequential" varchar(50), "BallotNumber" integer,
             "Name" varchar(200), "UrnName" varchar(200), "SocialName" varchar(200),
             "PartyId" uuid, "FederationId" uuid, "CoalitionId" uuid,
             "RegistrationStatus" varchar(100), "Gender" varchar(150), "Education" varchar(150),
             "Race" varchar(150), "Occupation" varchar(150), "BirthDate" date,
             "CreatedAt" timestamp with time zone, "UpdatedAt" timestamp with time zone)
-        ON CONFLICT ("ElectionId", "TseCandidateSequential") DO UPDATE SET
+        ON CONFLICT ("ElectionId", "StateId", "OfficeId", "TseCandidateSequential",
+                     "BallotNumber", "Name") DO UPDATE SET
             "OfficeId" = EXCLUDED."OfficeId",
             "StateId" = EXCLUDED."StateId",
             "CandidateIdentityId" = EXCLUDED."CandidateIdentityId",
@@ -67,7 +68,8 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
     private const string SelectCandidateIdsSql = """
         SELECT "TseCandidateSequential", "Id"
         FROM "Candidates"
-        WHERE "ElectionId" = @ElectionId;
+        WHERE "ElectionId" = @ElectionId
+          AND "StateId" = @StateId;
         """;
 
     public async Task<Guid> UpsertIdentityAsync(
@@ -132,17 +134,22 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
             cancellationToken: cancellationToken));
     }
 
-    public async Task<IReadOnlyDictionary<long, Guid>> GetCandidateIdsAsync(
+    public async Task<IReadOnlyDictionary<string, Guid>> GetCandidateIdsAsync(
         Guid electionId,
+        Guid stateId,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
-        var rows = await connection.QueryAsync<(long Sequential, Guid Id)>(new CommandDefinition(
+        var rows = await connection.QueryAsync<(string Sequential, Guid Id)>(new CommandDefinition(
             SelectCandidateIdsSql,
-            new { ElectionId = electionId },
+            new { ElectionId = electionId, StateId = stateId },
             cancellationToken: cancellationToken));
 
-        return rows.ToDictionary(row => row.Sequential, row => row.Id);
+        // A candidate sequential is only unique within an election and state, and historical
+        // files can still repeat it; first occurrence wins rather than throwing.
+        return rows
+            .GroupBy(row => row.Sequential, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Id, StringComparer.Ordinal);
     }
 }

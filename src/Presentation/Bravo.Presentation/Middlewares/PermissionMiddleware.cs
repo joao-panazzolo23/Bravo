@@ -15,19 +15,4 @@ public class PermissionMiddleware(
     {
         throw new NotImplementedException();
     }
-
-    //public async Task InvokeAsync(HttpContext context)
-    //{
-    //    var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier);
-
-    //    if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var userId))
-    //    {
-    //        var user = await repository.GetById(userId);
-    //        user.UserRoles.SelectMany(x => x.RoleType);
-    //        context.Items["UserPermissions"] = permissions;
-    //    }
-
-    //    await next(context);
-    //}
-
 }

@@ -7,11 +7,12 @@ namespace Bravo.Presentation.Transformers;
 /// Todo: inject Bearer JWT for testability
 /// </summary>
 public class JwtInjectTestTransformer(IServiceProvider provider,
-                                      IConfiguration configuration) : IOpenApiDocumentTransformer
+                                      IConfiguration configuration
+) : IOpenApiDocumentTransformer
 {
     /// <summary>
     /// Transformer for creating JWT Token when under development mode.
-    /// 
+    ///
     /// TODO: This token wouldn't be more easily statically configured at appsettings.json?
     /// </summary>
     /// <param name="document"></param>

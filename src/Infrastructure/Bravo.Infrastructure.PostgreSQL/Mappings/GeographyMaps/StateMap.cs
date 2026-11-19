@@ -14,7 +14,7 @@ internal sealed class StateMap : EntityMapper<State>
             .IsRequired();
 
         builder.Property(x => x.Abbreviation)
-            .HasMaxLength(2)
+            .HasMaxLength(20)
             .IsRequired();
 
         builder.Property(x => x.Name)

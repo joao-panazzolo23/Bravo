@@ -23,7 +23,8 @@ public sealed class DatasetVersionService(
         AcquiredDataset acquired,
         string scope,
         Guid jobId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(acquired);
 
@@ -38,11 +39,13 @@ public sealed class DatasetVersionService(
                 acquired.Sha256,
                 acquired.SizeBytes,
                 DateTime.UtcNow),
-            cancellationToken);
+            cancellationToken
+        );
 
         var version = await versions.CreateAsync(
             DatasetVersion.Create(record.Id, scope, jobId),
-            cancellationToken);
+            cancellationToken
+        );
 
         await versions.SetStatusAsync(version.Id, DatasetVersionStatus.Importing, cancellationToken);
 

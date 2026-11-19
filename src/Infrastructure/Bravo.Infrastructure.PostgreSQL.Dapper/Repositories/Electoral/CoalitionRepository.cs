@@ -66,9 +66,11 @@ internal sealed class CoalitionRepository(NpgsqlDataSource dataSource) : ICoalit
             SelectSql,
             cancellationToken: cancellationToken));
 
-        return rows.ToDictionary(
-            row => (row.ElectionRoundId, row.OfficeId, row.TseCoalitionNumber),
-            row => row.Id);
+        // A coalition number can repeat across states for the same round and office, so the
+        // key is not globally unique; collapse to the first row instead of throwing.
+        return rows
+            .GroupBy(row => (row.ElectionRoundId, row.OfficeId, row.TseCoalitionNumber))
+            .ToDictionary(group => group.Key, group => group.First().Id);
     }
 
     private sealed record CoalitionKeyRow(

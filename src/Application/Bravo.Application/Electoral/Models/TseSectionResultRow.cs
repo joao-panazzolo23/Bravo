@@ -14,4 +14,5 @@ public sealed record TseSectionResultRow(
     string BallotName,
     long Votes,
     int PollingPlaceNumber,
-    long? CandidateSequential);
+    string? CandidateSequential
+);

@@ -44,22 +44,32 @@ public static class TseValues
     public static long? ParseNullableLong(string? value)
         => IsSentinel(value) ? null : ParseLong(value);
 
+    /// <summary>
+    /// Parses an optional TSE date, returning null for missing or unusable values.
+    /// </summary>
+    /// <remarks>
+    /// TSE files contain placeholder dates (<c>00/00/1900</c>) and, in some historical files,
+    /// outright corrupt values (verified: <c>15/64/6514</c> in 1998/RJ). A corrupt optional
+    /// date must not abort an entire year's import, so it resolves to null rather than throwing.
+    /// </remarks>
     public static DateOnly? ParseNullableDate(string? value)
     {
         if (IsSentinel(value))
             return null;
 
-        if (!DateOnly.TryParseExact(
-                value!.Trim(),
-                "dd/MM/yyyy",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var parsed))
-        {
-            throw new FormatException($"'{value}' is not a valid date (expected dd/MM/yyyy).");
-        }
+        var trimmed = value!.Trim();
 
-        return parsed;
+        if (trimmed.StartsWith("00/00/", StringComparison.Ordinal) || trimmed == "00/00/0000")
+            return null;
+
+        return DateOnly.TryParseExact(
+            trimmed,
+            "dd/MM/yyyy",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var parsed)
+            ? parsed
+            : null;
     }
 
     /// <summary>

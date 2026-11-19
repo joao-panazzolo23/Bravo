@@ -1,12 +1,11 @@
 using Bravo.Application.Importing.Contracts;
 using Bravo.Application.Importing.Exceptions;
 using Bravo.Domain.Importing.Entities;
+using Bravo.Domain.Importing.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Importing.Services;
 
-/// Ugly. Very ugly.
-/// todo: refactor
 public sealed class ImportJobExecutor(
     IImportJobRepository jobRepository,
     IImportWorkUnitRepository workUnits,
@@ -24,6 +23,16 @@ public sealed class ImportJobExecutor(
 
         if (!await jobRepository.MarkRunningAsync(jobId, cancellationToken))
             return;
+
+        using var jobScope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["ImportJobId"] = jobId,
+            ["WorkerId"] = workerId
+        });
+
+        logger.LogInformation(
+            "Import job execution started. JobId: {JobId}, WorkerId: {WorkerId}, BatchSize: {BatchSize}, MaxAttempts: {MaxAttempts}, StartedAt: {StartedAt}.",
+            jobId, workerId, job.BatchSize, job.MaxAttempts, job.StartedAt);
 
         var leaseDuration = TimeSpan.FromSeconds(job.LeaseDurationSeconds);
 
@@ -54,13 +63,26 @@ public sealed class ImportJobExecutor(
         }
     }
 
-    private async Task ProcessWorkUnitAsync(        ImportJob job,
+    private async Task ProcessWorkUnitAsync(
+        ImportJob job,
         ImportWorkUnit workUnit,
         IImportPipeline pipeline,
         string workerId,
         TimeSpan leaseDuration,
         CancellationToken cancellationToken)
     {
+        using var unitScope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["ImportJobId"] = job.Id,
+            ["WorkerId"] = workerId,
+            ["WorkUnitId"] = workUnit.Id,
+            ["WorkUnitKey"] = workUnit.UnitKey
+        });
+
+        logger.LogInformation(
+            "Work unit claimed. JobId: {JobId}, WorkUnitId: {WorkUnitId}, Dataset: {Dataset}, Attempt: {Attempt}.",
+            job.Id, workUnit.Id, workUnit.UnitKey, workUnit.AttemptCount + 1);
+
         var attemptCount = workUnit.AttemptCount;
 
         while (true)
@@ -73,6 +95,8 @@ public sealed class ImportJobExecutor(
                 // unit must be completed here; otherwise its lease expires and it re-runs
                 // forever.
                 await workUnits.CompleteAsync(workUnit.Id, workUnit.FencingToken, cancellationToken);
+
+                await LogUnitCompletionAsync(job, workUnit, cancellationToken);
                 return;
             }
             catch (ImportLeaseLostException exception)
@@ -129,9 +153,8 @@ public sealed class ImportJobExecutor(
 
                     logger.LogWarning(
                         exception,
-                        "Import work unit {WorkUnitId} failed after {Attempts} attempt(s).",
-                        workUnit.Id,
-                        attempts);
+                        "Import work unit failed permanently. JobId: {JobId}, WorkUnitId: {WorkUnitId}, Dataset: {Dataset}, Attempts: {Attempts}, Error: {Error}.",
+                        job.Id, workUnit.Id, workUnit.UnitKey, attempts, exception.Message);
                     return;
                 }
 
@@ -151,10 +174,8 @@ public sealed class ImportJobExecutor(
 
                 logger.LogWarning(
                     exception,
-                    "Transient import failure for work unit {WorkUnitId}. Retrying in {DelayMs} ms after attempt {Attempts}.",
-                    workUnit.Id,
-                    delay!.Value.TotalMilliseconds,
-                    attempts);
+                    "Transient import failure; retrying. JobId: {JobId}, WorkUnitId: {WorkUnitId}, Dataset: {Dataset}, Attempt: {Attempt}/{MaxAttempts}, RetryDelayMs: {DelayMs}.",
+                    job.Id, workUnit.Id, workUnit.UnitKey, attempts, job.MaxAttempts, delay!.Value.TotalMilliseconds);
 
                 await Task.Delay(delay.Value, cancellationToken);
             }
@@ -162,9 +183,30 @@ public sealed class ImportJobExecutor(
     }
 
     /// <summary>
+    /// Logs completion with job-level counters so a reader can follow overall progress purely
+    /// from the log stream.
+    /// </summary>
+    private async Task LogUnitCompletionAsync(
+        ImportJob job,
+        ImportWorkUnit workUnit,
+        CancellationToken cancellationToken)
+    {
+        var units = await workUnits.GetByJobAsync(job.Id, cancellationToken);
+
+        var total = units.Count;
+        var completed = units.Count(unit => unit.Status == ImportWorkUnitStatus.Completed);
+        var failed = units.Count(unit => unit.Status == ImportWorkUnitStatus.Failed);
+        var percentage = total == 0 ? 0d : (double)completed / total * 100;
+
+        logger.LogInformation(
+            "Work unit completed. JobId: {JobId}, WorkUnitId: {WorkUnitId}, Dataset: {Dataset}, CompletedWorkUnits: {CompletedWorkUnits}, FailedWorkUnits: {FailedWorkUnits}, TotalWorkUnits: {TotalWorkUnits}, ProgressPercent: {ProgressPercent:F2}.",
+            job.Id, workUnit.Id, workUnit.UnitKey, completed, failed, total, percentage);
+    }
+
+    /// <summary>
     /// A pipeline is registered by stage, while work-unit keys are scoped
-    /// (<c>Stage:Year:State:Round:ElectionCode</c>). A candidate matches when the key equals
-    /// the stage or begins with it followed by the scope separator.
+    /// (<c>Stage:Year[:State]</c>). A candidate matches when the key equals the stage or
+    /// begins with it followed by the scope separator.
     /// </summary>
     private static bool Matches(string pipelineUnitKey, string workUnitKey)
         => string.Equals(pipelineUnitKey, workUnitKey, StringComparison.Ordinal)
