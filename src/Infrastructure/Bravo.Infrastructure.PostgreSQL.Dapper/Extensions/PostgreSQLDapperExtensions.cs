@@ -1,5 +1,5 @@
 using Bravo.Application.Acquisition.Providers;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Users.Repositories;
 using Bravo.Infrastructure.PostgreSQL.Dapper.Options;
@@ -9,6 +9,7 @@ using Bravo.Infrastructure.PostgreSQL.Dapper.Sessions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Infrastructure.PostgreSQL.Dapper.Extensions;
 

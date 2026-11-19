@@ -1,7 +1,8 @@
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Domain.Importing.Entities;
 using Dapper;
 using Npgsql;
+using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Importing;
 

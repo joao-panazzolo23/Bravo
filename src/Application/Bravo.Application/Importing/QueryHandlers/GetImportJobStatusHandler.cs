@@ -1,8 +1,9 @@
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.Queries;
 using Bravo.Application.Importing.ViewModels;
 using Bravo.Shared.Result;
 using Mediator;
+using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Application.Importing.QueryHandlers;
 

@@ -1,10 +1,11 @@
 using Bravo.Application.Importing.Commands;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.ViewModels;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Shared.Result;
 using Mediator;
+using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Application.Importing.Handlers;
 

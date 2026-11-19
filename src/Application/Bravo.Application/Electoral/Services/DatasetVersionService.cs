@@ -1,7 +1,8 @@
-using Bravo.Application.Electoral.Contracts;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Electoral.Services;
+using Bravo.Domain.Importing.Services;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Enums;
+using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Application.Electoral.Services;
 

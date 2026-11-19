@@ -1,5 +1,5 @@
-using Bravo.Application.Importing.Contracts;
-using Bravo.Application.Importing.Models;
+using Bravo.Domain.Importing.Services;
+using Bravo.Domain.Importing.Models;
 using Bravo.Domain.Geography.Entities;
 
 namespace Bravo.IntegrationTests.Importing;

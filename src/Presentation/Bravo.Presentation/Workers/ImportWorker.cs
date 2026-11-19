@@ -1,7 +1,8 @@
 using System.Collections.Concurrent;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.Services;
 using Microsoft.Extensions.Options;
+using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Presentation.Workers;
 

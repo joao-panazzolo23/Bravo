@@ -1,6 +1,6 @@
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.Exceptions;
-using Bravo.Application.Importing.Models;
+using Bravo.Domain.Importing.Models;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Enums;
 using Dapper;

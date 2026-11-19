@@ -1,6 +1,6 @@
-using Bravo.Application.Electoral.Contracts;
+using Bravo.Domain.Electoral.Services;
 using Bravo.Application.Electoral.Services;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Infrastructure.Tse.Acquisition;
 using Bravo.Infrastructure.Tse.Downloads;
 using Bravo.Infrastructure.Tse.Extraction;

@@ -1,7 +1,7 @@
-using Bravo.Application.Electoral.Contracts;
-using Bravo.Application.Electoral.Models;
+using Bravo.Domain.Electoral.Services;
+using Bravo.Domain.Electoral.Models;
 using Bravo.Application.Importing;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.Exceptions;
 using Bravo.Application.Importing.Services;
 using Bravo.Domain.Electoral.Entities;
@@ -9,6 +9,8 @@ using Bravo.Domain.Electoral.Enums;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Enums;
 using Microsoft.Extensions.Logging;
+using Bravo.Domain.Electoral.Repositories;
+using Bravo.Domain.Geography.Repositories;
 
 namespace Bravo.Application.Electoral.Services;
 

@@ -1,6 +1,7 @@
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Domain.Importing.Entities;
 using Microsoft.Extensions.Logging;
+using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Application.Importing.Services;
 

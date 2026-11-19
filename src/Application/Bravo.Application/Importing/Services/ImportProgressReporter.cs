@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Domain.Importing.Enums;
 using Microsoft.Extensions.Logging;
 

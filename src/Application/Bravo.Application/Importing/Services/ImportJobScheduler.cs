@@ -1,10 +1,12 @@
-using Bravo.Application.Importing.Contracts;
-using Bravo.Application.Importing.Models;
+using Bravo.Domain.Importing.Services;
+using Bravo.Domain.Importing.Models;
 using Bravo.Application.Importing.Options;
 using Bravo.Application.Importing.ViewModels;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Shared.Result;
 using Microsoft.Extensions.Options;
+using Bravo.Domain.Importing.Repositories;
+using Bravo.Application.Importing.Models;
 
 namespace Bravo.Application.Importing.Services;
 

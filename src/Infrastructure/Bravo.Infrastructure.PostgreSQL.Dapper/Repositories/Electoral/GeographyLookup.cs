@@ -1,6 +1,7 @@
-using Bravo.Application.Electoral.Contracts;
+using Bravo.Domain.Electoral.Services;
 using Dapper;
 using Npgsql;
+using Bravo.Domain.Geography.Repositories;
 
 namespace Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Electoral;
 

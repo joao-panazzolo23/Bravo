@@ -1,6 +1,7 @@
-using Bravo.Application.Electoral.Models;
+using Bravo.Domain.Electoral.Models;
 using Bravo.Domain.Electoral.Enums;
 using FluentAssertions;
+using Bravo.Domain.Electoral.Services;
 
 namespace Bravo.UnitTests.Electoral;
 

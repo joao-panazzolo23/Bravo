@@ -1,6 +1,7 @@
-using Bravo.Application.Electoral.Contracts;
+using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Geography.Entities;
 using Microsoft.Extensions.Logging;
+using Bravo.Domain.Geography.Repositories;
 
 namespace Bravo.Application.Electoral.Services;
 

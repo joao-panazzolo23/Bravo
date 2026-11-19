@@ -1,6 +1,6 @@
 using Bravo.Application.Acquisition.Providers;
-using Bravo.Application.Importing.Contracts;
-using Bravo.Application.Importing.Models;
+using Bravo.Domain.Importing.Services;
+using Bravo.Domain.Importing.Models;
 
 namespace Bravo.Infrastructure.Acquisition.Validators;
 

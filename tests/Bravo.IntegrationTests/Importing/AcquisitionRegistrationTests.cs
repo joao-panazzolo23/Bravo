@@ -1,5 +1,5 @@
 using Bravo.Application.Importing;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.Services;
 using Bravo.IntegrationTests.Configurations;
 using FluentAssertions;

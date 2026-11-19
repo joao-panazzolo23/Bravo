@@ -1,8 +1,9 @@
 using System.Text.Json;
-using Bravo.Application.Electoral.Contracts;
+using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Electoral.Entities;
 using Dapper;
 using Npgsql;
+using Bravo.Domain.Electoral.Repositories;
 
 namespace Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Electoral;
 

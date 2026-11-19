@@ -1,5 +1,5 @@
-using Bravo.Application.Electoral.Contracts;
-using Bravo.Application.Electoral.Models;
+using Bravo.Domain.Electoral.Services;
+using Bravo.Domain.Electoral.Models;
 using Bravo.Infrastructure.Tse.Layouts;
 using Bravo.Infrastructure.Tse.Layouts.Candidates;
 using Bravo.Infrastructure.Tse.Parsing;

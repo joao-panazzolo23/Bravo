@@ -1,5 +1,5 @@
 namespace Bravo.Application.Importing;
-
+//todo: trash way to handle things
 /// <summary>
 /// The TSE years the importer enumerates. Every year for which TSE publishes a candidate
 /// archive is included; the list is data, not a user-supplied filter.

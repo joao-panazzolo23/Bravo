@@ -1,7 +1,8 @@
-using Bravo.Application.Importing.Models;
+using Bravo.Domain.Importing.Models;
 using Bravo.Application.Importing.ViewModels;
 using Bravo.Shared.Result;
 using Mediator;
+using Bravo.Application.Importing.Models;
 
 namespace Bravo.Application.Importing.Commands;
 

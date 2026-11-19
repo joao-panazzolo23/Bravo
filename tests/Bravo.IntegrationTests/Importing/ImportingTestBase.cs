@@ -1,6 +1,6 @@
 using Bravo.Application.Importing.Commands;
-using Bravo.Application.Importing.Contracts;
-using Bravo.Application.Importing.Models;
+using Bravo.Domain.Importing.Services;
+using Bravo.Domain.Importing.Models;
 using Bravo.Application.Importing.Services;
 using Bravo.Application.Importing.ViewModels;
 using Bravo.Domain.Geography.Entities;
@@ -11,6 +11,7 @@ using Bravo.IntegrationTests.Configurations;
 using Bravo.Shared.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.IntegrationTests.Importing;
 

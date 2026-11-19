@@ -3,7 +3,9 @@ using Microsoft.Extensions.Options;
 
 namespace Bravo.Application.Importing.Services;
 
-public sealed class ImportRetryPolicy(IOptions<ImportEngineOptions> options)
+public sealed class ImportRetryPolicy(
+    IOptions<ImportEngineOptions> options
+)
 {
     public TimeSpan GetDelay(int attempt, TimeSpan? retryAfter)
     {

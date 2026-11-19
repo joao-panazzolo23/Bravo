@@ -17,4 +17,5 @@ public sealed record ImportProgressSnapshot(
     long RejectedRecords,
     long? TotalRecords,
     TimeSpan Elapsed,
-    double? RecordsPerSecond);
+    double? RecordsPerSecond
+);

@@ -1,9 +1,9 @@
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Bravo.Application.Importing.Contracts;
+using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.Exceptions;
-using Bravo.Application.Importing.Models;
+using Bravo.Domain.Importing.Models;
 using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Infrastructure.Acquisition.Models;

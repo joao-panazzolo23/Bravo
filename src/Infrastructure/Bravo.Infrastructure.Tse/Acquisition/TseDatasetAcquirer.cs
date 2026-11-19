@@ -1,4 +1,4 @@
-using Bravo.Application.Electoral.Contracts;
+using Bravo.Domain.Electoral.Services;
 using Bravo.Infrastructure.Tse.Downloads;
 using Bravo.Infrastructure.Tse.Extraction;
 using Bravo.Infrastructure.Tse.Options;

@@ -1,6 +1,8 @@
-using Bravo.Application.Electoral.Contracts;
+using Bravo.Domain.Electoral.Services;
 using Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Electoral;
 using Microsoft.Extensions.DependencyInjection;
+using Bravo.Domain.Electoral.Repositories;
+using Bravo.Domain.Geography.Repositories;
 
 namespace Bravo.Infrastructure.PostgreSQL.Dapper.Extensions;
 

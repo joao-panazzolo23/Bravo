@@ -1,4 +1,4 @@
-using Bravo.Application.Importing.Models;
+using Bravo.Domain.Importing.Models;
 using Bravo.Domain.Importing.Enums;
 using Bravo.IntegrationTests.Configurations;
 using FluentAssertions;

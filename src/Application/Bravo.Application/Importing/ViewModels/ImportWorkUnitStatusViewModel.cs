@@ -13,4 +13,5 @@ public sealed record ImportWorkUnitStatusViewModel(
     DateTime? LeaseExpiresAt,
     long FencingToken,
     DateTime? StartedAt,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt
+);

@@ -5,6 +5,7 @@ using FluentValidation;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 
+using Bravo.Application.Notifications;
 namespace Bravo.Application.Extensions;
 
 public static class ApplicationExtensions
