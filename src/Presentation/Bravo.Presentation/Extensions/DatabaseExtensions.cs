@@ -1,4 +1,4 @@
-using Bravo.Infrastructure.Acquisition.Extensions;
+using Bravo.Infrastructure.Ibge.Extensions;
 using Bravo.Infrastructure.PostgreSQL.Dapper.Extensions;
 using Bravo.Infrastructure.PostgreSQL.Extensions;
 using Bravo.Infrastructure.Tse.Extensions;
