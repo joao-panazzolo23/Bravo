@@ -1,4 +1,5 @@
-﻿using Bravo.Presentation.Exceptions.Strategies.Abstract;
+using Bravo.Presentation.Exceptions.Strategies.Abstract;
+using Bravo.Presentation.Logging;
 using Microsoft.AspNetCore.Diagnostics;
 
 namespace Bravo.Presentation.Exceptions;
@@ -14,7 +15,7 @@ public sealed class GlobalExceptionHandler(
         CancellationToken cancellationToken
         )
     {
-        _logger.LogError($"Exception registered: {exception.Message}", exception);
+        PresentationLog.UnhandledException(_logger, exception.Message, exception);
 
         var handler = _handlers.First(x => x.CanHandle(exception));
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography;
+using Bravo.Application.Logging;
 using Bravo.Infrastructure.Tse.Options;
 using Bravo.Infrastructure.Tse.RateLimiting;
 using Bravo.Infrastructure.Tse.Resilience;
@@ -25,6 +26,8 @@ public sealed class TseFileDownloader(
         ArgumentException.ThrowIfNullOrWhiteSpace(relativeUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
 
+        ProcessingLog.DownloadStarted(logger, relativeUrl);
+
         Directory.CreateDirectory(_options.TempDirectory);
 
         var destination = Path.Combine(_options.TempDirectory, fileName);
@@ -35,6 +38,8 @@ public sealed class TseFileDownloader(
             var result = await DownloadWithRetryAsync(relativeUrl, partial, cancellationToken);
 
             File.Move(partial, destination, overwrite: true);
+
+            ProcessingLog.DownloadCompleted(logger, relativeUrl, result.SizeBytes, result.Sha256);
 
             return new DownloadedFile(destination, fileName, result.SizeBytes, result.Sha256, relativeUrl);
         }
@@ -67,13 +72,13 @@ public sealed class TseFileDownloader(
 
                 var delay = backoff.GetDelay(attempt, exception.RetryAfter);
 
-                logger.LogWarning(
-                    exception,
-                    "Transient TSE download failure for {Url}; retrying in {DelayMs} ms (attempt {Attempt}/{MaxAttempts}).",
+                ProcessingLog.DownloadRetrying(
+                    logger,
                     relativeUrl,
                     delay.TotalMilliseconds,
                     attempt,
-                    backoff.MaxAttempts);
+                    backoff.MaxAttempts,
+                    exception);
 
                 await Task.Delay(delay, cancellationToken);
             }

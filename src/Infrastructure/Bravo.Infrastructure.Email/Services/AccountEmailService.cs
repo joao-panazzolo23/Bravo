@@ -2,6 +2,7 @@ using Bravo.Domain.Auth.ValueObjects;
 using Bravo.Domain.Services.Email;
 using Bravo.Domain.Users.Entities;
 using Bravo.Infrastructure.Email.DTO;
+using Bravo.Infrastructure.Email.Logging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -50,7 +51,7 @@ internal sealed class AccountEmailService(
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Falha ao enviar o e-mail '{Subject}' para o usuário {UserId}", subject, user.Id);
+            AccountEmailLog.EmailSendFailed(logger, subject, user.Id, exception);
         }
     }
 }

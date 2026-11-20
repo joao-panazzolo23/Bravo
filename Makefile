@@ -52,3 +52,6 @@ docker-ps:
 
 docker-db:
 	docker compose up -d postgres
+
+aspire:
+	npx -y @microsoft/aspire-cli dashboard run

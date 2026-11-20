@@ -1,3 +1,4 @@
+using Bravo.Application.Logging;
 using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Geography.Entities;
 using Microsoft.Extensions.Logging;
@@ -51,7 +52,7 @@ public sealed class TseSyntheticScopeSeeder(
         if (!refreshed.TryGetValue(scope, out var created))
             throw new InvalidOperationException($"Failed to create synthetic scope '{scope}'.");
 
-        logger.LogInformation("Created synthetic geographic scope '{Scope}'.", scope);
+        ValidationLog.SyntheticScopeCreated(logger, scope);
 
         return created;
     }

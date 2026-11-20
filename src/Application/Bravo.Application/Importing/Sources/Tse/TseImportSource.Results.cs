@@ -1,3 +1,4 @@
+using Bravo.Application.Logging;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Application.Electoral;
 using Bravo.Domain.Electoral.Entities;
@@ -46,6 +47,8 @@ public sealed partial class TseImportSource
             ParallelOptionsFor(context, cancellationToken),
             async (pair, token) =>
             {
+                using var scope = logger.BeginOperationScope(year: pair.Year, state: pair.State);
+
                 try
                 {
                     var count = await ImportResultScopeAsync(
@@ -58,10 +61,7 @@ public sealed partial class TseImportSource
                 {
                     Interlocked.Increment(ref failed);
 
-                    logger.LogError(
-                        exception,
-                        "TSE results import failed for {Year}/{State}; continuing with other scopes.",
-                        pair.Year, pair.State);
+                    ProcessingLog.ResultScopeImportFailed(logger, pair.Year, pair.State, exception);
                 }
 
                 context.Report(
@@ -94,9 +94,8 @@ public sealed partial class TseImportSource
 
             await datasetVersions.CompleteAsync(version.Id, cancellationToken);
 
-            logger.LogInformation(
-                "Imported {Imported} TSE section results for {Year}/{State}.",
-                imported, year, state);
+            PersistenceLog.SectionResultsUpserted(
+                logger, imported, year, state);
 
             return imported;
         }

@@ -1,4 +1,5 @@
 using Bravo.Application.Importing.Options;
+using Bravo.Application.Logging;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Importing.Models;
 using Bravo.Domain.Importing.Repositories;
@@ -104,8 +105,7 @@ public sealed class ImportProgressSink(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(
-                exception, "Could not persist progress for import job {JobId}.", jobId);
+            PersistenceLog.ProgressPersistFailed(logger, jobId, exception);
         }
     }
 }

@@ -1,3 +1,4 @@
+using Bravo.Application.Logging;
 using Bravo.Infrastructure.Tse.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -70,7 +71,7 @@ public sealed class TseWorkspace : IDisposable
                     continue;
 
                 Directory.Delete(directory, recursive: true);
-                logger.LogInformation("Removed stale TSE workspace '{Directory}'.", directory);
+                ProcessingLog.WorkspaceCleaned(logger, directory);
             }
             catch (IOException)
             {

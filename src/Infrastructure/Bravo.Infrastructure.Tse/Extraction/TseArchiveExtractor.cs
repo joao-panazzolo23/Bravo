@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using Bravo.Application.Logging;
 using Bravo.Infrastructure.Tse.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -78,7 +79,7 @@ internal sealed class TseArchiveExtractor(
                     $"Archive extraction exceeded the total limit of {_options.MaxExtractedBytes} bytes.");
             }
 
-            logger.LogDebug("Extracted '{Entry}' ({Bytes} bytes).", entry.FullName, written);
+            ProcessingLog.EntryExtracted(logger, entry.FullName, written);
 
             extracted.Add(new ExtractedFile(target, entry.FullName, written));
         }

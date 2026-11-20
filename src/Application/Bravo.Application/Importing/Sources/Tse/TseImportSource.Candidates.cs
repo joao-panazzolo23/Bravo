@@ -1,3 +1,4 @@
+using Bravo.Application.Logging;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Application.Electoral;
 using Bravo.Domain.Electoral.Entities;
@@ -41,6 +42,8 @@ public sealed partial class TseImportSource
             ParallelOptionsFor(context, cancellationToken),
             async (year, token) =>
             {
+                using var yearScope = logger.BeginOperationScope(year: year);
+
                 try
                 {
                     var count = await ImportCandidateYearAsync(year, context.BatchSize, token);
@@ -53,10 +56,7 @@ public sealed partial class TseImportSource
                     Interlocked.Increment(ref failed);
                     Interlocked.Add(ref rejected, 1);
 
-                    logger.LogError(
-                        exception,
-                        "TSE candidate import failed for {Year}; continuing with other years.",
-                        year);
+                    ProcessingLog.CandidateImportFailed(logger, year, exception);
                 }
 
                 context.Report(
@@ -91,13 +91,13 @@ public sealed partial class TseImportSource
 
         foreach (var file in files)
         {
+            using var stateScope = logger.BeginOperationScope(year: year, state: file.StateAcronym);
+
             var stateId = await ResolveStateIdAsync(file.StateAcronym, stateIds, cancellationToken);
 
             if (stateId is null)
             {
-                logger.LogWarning(
-                    "Skipping TSE candidates for {Year}/{State}: no geography row could be resolved.",
-                    year, file.StateAcronym);
+                ValidationLog.GeographyResolutionSkipped(logger, "candidates", year, file.StateAcronym);
 
                 continue;
             }
@@ -118,9 +118,7 @@ public sealed partial class TseImportSource
                 cancellationToken);
         }
 
-        logger.LogInformation(
-            "Imported {Count} TSE candidate registrations for {Year} across {States} state files.",
-            imported, year, files.Count);
+        PersistenceLog.CandidateRegistrationsUpserted(logger, imported, year, files.Count);
 
         return imported;
     }
@@ -181,8 +179,8 @@ public sealed partial class TseImportSource
             imported += buffer.Count;
         }
 
-        logger.LogDebug(
-            "Imported {Count} candidates for {Year}/{State}.", imported, year, stateAcronym);
+        PersistenceLog.CandidatesUpsertedForState(
+            logger, imported, year, stateAcronym);
 
         return imported;
     }

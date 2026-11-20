@@ -1,3 +1,4 @@
+using Bravo.Application.Logging;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Electoral.Models;
@@ -35,6 +36,8 @@ public sealed partial class TseImportSource
             ParallelOptionsFor(context, cancellationToken),
             async (year, token) =>
             {
+                using var yearScope = logger.BeginOperationScope(year: year);
+
                 try
                 {
                     var count = await ImportReferenceYearAsync(year, token);
@@ -46,10 +49,7 @@ public sealed partial class TseImportSource
                 {
                     Interlocked.Increment(ref failed);
 
-                    logger.LogError(
-                        exception,
-                        "TSE reference import failed for {Year}; continuing with other years.",
-                        year);
+                    ProcessingLog.ReferenceImportFailed(logger, year, exception);
                 }
 
                 context.Report(
@@ -116,9 +116,8 @@ public sealed partial class TseImportSource
             cancellationToken
         );
 
-        logger.LogInformation(
-            "Imported {Year} TSE reference data: {Elections} election rounds, {Offices} offices, {Parties} parties, {Federations} federations.",
-            year, elections.Count, offices.Count, parties.Count, federations.Count);
+        PersistenceLog.ReferenceDataUpserted(
+            logger, year, elections.Count, offices.Count, parties.Count, federations.Count);
 
         return offices.Count + parties.Count + federations.Count;
     }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Bravo.Application.Importing.Options;
 using Bravo.Application.Importing.Services;
+using Bravo.Application.Logging;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Importing.Models;
@@ -35,7 +36,7 @@ public sealed class ImportWorker(
     {
         if (!_worker.Enabled)
         {
-            logger.LogInformation("Import worker is disabled by configuration.");
+            WorkerLog.WorkerDisabled(logger);
             return;
         }
 
@@ -55,7 +56,7 @@ public sealed class ImportWorker(
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Import worker polling failed.");
+                WorkerLog.WorkerPollingFailed(logger, exception);
             }
 
             try
@@ -89,14 +90,12 @@ public sealed class ImportWorker(
 
             if (released > 0)
             {
-                logger.LogWarning(
-                    "Recovered {Count} import job(s) abandoned by a previous process on {MachineName}.",
-                    released, Environment.MachineName);
+                WorkerLog.WorkerAbandonedJobsRecovered(logger, released, Environment.MachineName);
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogError(exception, "Import worker could not release abandoned jobs at startup.");
+            WorkerLog.WorkerReleaseAbandonedFailed(logger, exception);
         }
     }
 
@@ -114,9 +113,7 @@ public sealed class ImportWorker(
 
             if (!await _slots.WaitAsync(0, cancellationToken))
             {
-                logger.LogDebug(
-                    "Worker {WorkerId} is at capacity with {RunningJobs} job(s) in flight.",
-                    _workerId, _running.Count);
+                WorkerLog.WorkerIdle(logger, _workerId, _running.Count);
                 break;
             }
 
@@ -153,7 +150,7 @@ public sealed class ImportWorker(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogError(exception, "Worker {WorkerId} could not claim import job {JobId}.", _workerId, jobId);
+            WorkerLog.WorkerClaimFailed(logger, _workerId, jobId, exception);
             return;
         }
 
@@ -171,21 +168,13 @@ public sealed class ImportWorker(
                 $"No import source is registered for '{job.Source}'.",
                 CancellationToken.None);
 
-            logger.LogError(
-                "Import job {JobId} references unregistered source {Source}.", job.Id, job.Source);
+            WorkerLog.UnregisteredSource(logger, job.Id, job.Source);
             return;
         }
 
-        using var jobScope = logger.BeginScope(new Dictionary<string, object>
-        {
-            ["ImportJobId"] = job.Id,
-            ["ImportSource"] = job.Source,
-            ["WorkerId"] = _workerId
-        });
+        using var jobScope = logger.BeginJobScope(job.Id, job.Source, _workerId);
 
-        logger.LogInformation(
-            "Import job claimed. JobId: {JobId}, Source: {Source}, Scope: {Scope}, Attempt: {Attempt}.",
-            job.Id, job.Source, job.Scope, job.AttemptCount);
+        ImportLog.JobStarted(logger, job.Id, job.Source, job.Scope, job.AttemptCount);
 
         // Cancellation is scoped to this execution: the process may be shutting down, or the
         // heartbeat may observe that the job was cancelled or taken over.
@@ -223,22 +212,26 @@ public sealed class ImportWorker(
                 error: null,
                 CancellationToken.None);
 
-            logger.LogInformation(
-                "Import job completed. JobId: {JobId}, ProcessedRecords: {ProcessedRecords}, FailedRecords: {FailedRecords}.",
-                job.Id, finished?.TotalProcessedRecords, finished?.TotalFailedRecords);
+            if (status == ImportJobStatus.CompletedWithErrors)
+            {
+                ImportLog.JobCompletedWithErrors(logger, job.Id, finished?.TotalProcessedRecords, finished?.TotalFailedRecords);
+            }
+            else
+            {
+                ImportLog.JobCompleted(logger, job.Id, finished?.TotalProcessedRecords, finished?.TotalFailedRecords);
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             await jobs.ReleaseAsync(
                 job.Id, _workerId, "Application is shutting down.", CancellationToken.None);
 
-            logger.LogInformation(
-                "Import job released for restart after shutdown. JobId: {JobId}.", job.Id);
+            ImportLog.JobReleased(logger, job.Id);
         }
         catch (OperationCanceledException)
         {
             // The job was cancelled or lost its lease; the row is already in its final state.
-            logger.LogInformation("Import job execution stopped. JobId: {JobId}.", job.Id);
+            ImportLog.JobStopped(logger, job.Id);
         }
         catch (Exception exception)
         {
@@ -278,9 +271,7 @@ public sealed class ImportWorker(
                 if (renewed)
                     continue;
 
-                logger.LogWarning(
-                    "Import job {JobId} is no longer owned by worker {WorkerId}; stopping execution.",
-                    jobId, _workerId);
+                WorkerLog.WorkerLeaseLost(logger, jobId, _workerId);
 
                 executionCts.Cancel();
                 return;
@@ -291,7 +282,7 @@ public sealed class ImportWorker(
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Heartbeat failed for import job {JobId}.", jobId);
+            WorkerLog.WorkerHeartbeatFailed(logger, jobId, exception);
         }
     }
 
@@ -310,7 +301,7 @@ public sealed class ImportWorker(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(exception, "Could not renew the lease for import job {JobId}.", jobId);
+            WorkerLog.WorkerLeaseRenewFailed(logger, jobId, exception);
             return true;
         }
     }
@@ -333,10 +324,14 @@ public sealed class ImportWorker(
             retryAt = DateTime.UtcNow.Add(delay);
         }
 
-        logger.LogError(
-            exception,
-            "Import job failed. JobId: {JobId}, Source: {Source}, Attempt: {Attempt}/{MaxAttempts}, RetryAt: {RetryAt}.",
-            job.Id, job.Source, job.AttemptCount, job.MaxAttempts, retryAt);
+        ImportLog.JobFailed(
+            logger,
+            job.Id,
+            job.Source,
+            job.AttemptCount,
+            job.MaxAttempts,
+            retryAt,
+            exception);
 
         await jobs.FailAsync(
             job.Id,

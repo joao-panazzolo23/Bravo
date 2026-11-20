@@ -1,3 +1,4 @@
+using Bravo.Application.Logging;
 using Bravo.Domain.Importing.Enums;
 using System.Net;
 using System.Text.Json;
@@ -52,9 +53,7 @@ public sealed class IbgeImportSource(
         var municipalities = await ImportMunicipalitiesAsync(context.BatchSize, cancellationToken);
         context.Report(ImportStage.Persisting, OperationCount, 2, 0, states + municipalities, 0, null);
 
-        logger.LogInformation(
-            "IBGE import finished with {States} states and {Municipalities} municipalities.",
-            states, municipalities);
+        PersistenceLog.IbgeImportCompleted(logger, states, municipalities);
     }
 
     private async Task<int> ImportStatesAsync(int batchSize, CancellationToken cancellationToken)
@@ -156,9 +155,8 @@ public sealed class IbgeImportSource(
 
             if (string.IsNullOrWhiteSpace(item.Sail) || string.IsNullOrWhiteSpace(region))
             {
-                logger.LogWarning(
-                    "Discarding IBGE state {StateId} because required fields are missing.",
-                    item.Id);
+                ValidationLog.IbgeRecordDiscarded(
+                    logger, "state", item.Id, "required fields are missing");
 
                 yield return null;
                 continue;
@@ -196,9 +194,8 @@ public sealed class IbgeImportSource(
 
             if (stateCode is null)
             {
-                logger.LogWarning(
-                    "Discarding IBGE municipality {MunicipalityId} because its state could not be resolved.",
-                    item.Id);
+                ValidationLog.IbgeRecordDiscarded(
+                    logger, "municipality", item.Id, "state could not be resolved");
 
                 continue;
             }
