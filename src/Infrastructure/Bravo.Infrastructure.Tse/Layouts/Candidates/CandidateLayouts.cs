@@ -1,9 +1,8 @@
 using System.Text;
-using Bravo.Infrastructure.Tse.Layouts;
 
 namespace Bravo.Infrastructure.Tse.Layouts.Candidates;
 
-public static class CandidateLayouts
+internal static class CandidateLayouts
 {
     public const string Version2022 = "cand-2022-v1";
     public const string Version2010 = "cand-2010-v1";

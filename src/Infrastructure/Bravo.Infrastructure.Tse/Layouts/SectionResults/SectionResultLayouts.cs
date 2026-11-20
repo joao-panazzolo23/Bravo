@@ -1,9 +1,8 @@
 using System.Text;
-using Bravo.Infrastructure.Tse.Layouts;
 
 namespace Bravo.Infrastructure.Tse.Layouts.SectionResults;
 
-public static class SectionResultLayouts
+internal static class SectionResultLayouts
 {
     public const string Version2022 = "vot-secao-2022-v1";
 

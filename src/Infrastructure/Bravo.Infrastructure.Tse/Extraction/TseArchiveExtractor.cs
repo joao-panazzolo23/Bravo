@@ -9,7 +9,7 @@ namespace Bravo.Infrastructure.Tse.Extraction;
 /// Extracts ZIP archives with explicit defenses against path traversal, zip bombs,
 /// entry-count abuse and oversized payloads.
 /// </summary>
-public sealed class TseArchiveExtractor(
+internal sealed class TseArchiveExtractor(
     IOptions<TseOptions> options,
     ILogger<TseArchiveExtractor> logger)
 {

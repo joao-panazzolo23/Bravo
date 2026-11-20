@@ -11,7 +11,7 @@ namespace Bravo.Infrastructure.Tse.Readers;
 /// projected onto canonical field names, so callers never depend on source-specific
 /// column ordering or naming.
 /// </remarks>
-public sealed class TseRecordReader
+internal sealed class TseRecordReader
 {
     private readonly TseLayout _layout;
 

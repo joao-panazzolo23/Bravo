@@ -15,7 +15,7 @@ public sealed class TseLayoutMismatchException(string message) : Exception(messa
 /// the file does not contain are reported so a layout mismatch fails loudly instead of
 /// silently producing empty values.
 /// </remarks>
-public sealed class TseCsvRecordMapper
+internal sealed class TseCsvRecordMapper
 {
     private readonly TseLayout _layout;
     private readonly string[] _canonicalByIndex;
@@ -31,9 +31,9 @@ public sealed class TseCsvRecordMapper
         _missingColumns = missingColumns;
     }
 
-    public TseLayout Layout => _layout;
+    // public TseLayout Layout => _layout;
 
-    public IReadOnlyList<string> MissingColumns => _missingColumns;
+    // public IReadOnlyList<string> MissingColumns => _missingColumns;
 
     public static TseCsvRecordMapper Create(
         TseLayout layout,

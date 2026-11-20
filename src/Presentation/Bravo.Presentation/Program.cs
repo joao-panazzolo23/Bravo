@@ -1,12 +1,9 @@
 using Bravo.Application.Extensions;
 using Bravo.Infrastructure.Email.Extensions;
 using Bravo.Presentation.Extensions;
-using Bravo.Presentation.Logging;
 using Bravo.Presentation.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Logging.AddRollingFile(builder.Configuration);
 
 builder.AddOpenTelemetryConfiguration();
 
