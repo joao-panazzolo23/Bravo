@@ -10,11 +10,10 @@ internal sealed class TseMunicipalityCodeMap : EntityMapper<TseMunicipalityCode>
     {
         builder.ToTable("TseMunicipalityCodes");
 
-        builder.Property(x => x.RawCode).HasMaxLength(10).IsRequired();
+        builder.Property(x => x.RawCode).IsRequired();
 
         builder.Property(x => x.MatchMethod)
             .HasConversion<string>()
-            .HasMaxLength(30)
             .IsRequired();
 
         builder.Property(x => x.Confidence).HasPrecision(3, 2).IsRequired();

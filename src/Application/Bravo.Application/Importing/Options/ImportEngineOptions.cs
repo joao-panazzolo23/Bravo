@@ -16,7 +16,7 @@ public sealed class ImportEngineOptions
     public int DefaultMaxAttempts { get; set; } = 3;
 
     [Range(1, 64)]
-    public int DefaultMaxParallelism { get; set; } = 3;
+    public int DefaultMaxParallelism { get; set; } = 64;
 
     [Range(1, 86_400)]
     public int DefaultLeaseDurationSeconds { get; set; } = 120;

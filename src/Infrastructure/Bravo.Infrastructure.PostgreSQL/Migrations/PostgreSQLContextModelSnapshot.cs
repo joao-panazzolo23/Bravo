@@ -702,8 +702,7 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ZipCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("ZoneId")
                         .HasColumnType("uuid");
@@ -774,16 +773,14 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
                     b.Property<string>("MatchMethod")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("MunicipalityId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("RawCode")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("StateId")
                         .HasColumnType("uuid");

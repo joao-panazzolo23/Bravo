@@ -7,6 +7,7 @@ using Npgsql;
 
 namespace Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Importing;
 
+///this one could be a EF Core repo
 internal sealed class ImportJobRepository(NpgsqlDataSource dataSource) : IImportJobRepository
 {
     private const string LockImportScopeSql = """

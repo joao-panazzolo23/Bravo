@@ -13,7 +13,7 @@ internal sealed class PollingPlaceMap : EntityMapper<PollingPlace>
         builder.Property(x => x.Name).HasMaxLength(250).IsRequired();
         builder.Property(x => x.Address).HasMaxLength(300);
         builder.Property(x => x.Neighborhood).HasMaxLength(150);
-        builder.Property(x => x.ZipCode).HasMaxLength(10);
+        builder.Property(x => x.ZipCode);
         builder.Property(x => x.Latitude).HasPrecision(10, 7);
         builder.Property(x => x.Longitude).HasPrecision(10, 7);
 

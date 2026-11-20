@@ -15,7 +15,8 @@ public class Federation : Entity
         int tseFederationNumber,
         string name,
         string acronym,
-        string? composition)
+        string? composition
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(acronym);
