@@ -9,12 +9,7 @@ namespace Bravo.Application.Importing.Sources.Tse;
 public sealed partial class TseImportSource
 {
     /// <summary>
-    /// Imports elections, rounds, offices, parties and federations, one year at a time.
-    /// </summary>
-    /// <remarks>
-    /// Every state file in a year's candidate archive is read because reference values are
-    /// denormalised per candidate row. Years are independent, so they run in parallel up to
-    /// the stage limit.
+    /// ta feio essa bomba
     /// </remarks>
     private async Task ImportReferencesAsync(
         ImportExecutionContext context,
@@ -32,7 +27,8 @@ public sealed partial class TseImportSource
             failed,
             processed,
             0,
-            "Reference data");
+            "Reference data"
+        );
 
         await Parallel.ForEachAsync(
             years,
@@ -41,7 +37,7 @@ public sealed partial class TseImportSource
             {
                 try
                 {
-                    var count = await ImportReferenceYearAsync(year, context.BatchSize, token);
+                    var count = await ImportReferenceYearAsync(year, token);
 
                     Interlocked.Add(ref processed, count);
                     Interlocked.Increment(ref completed);
@@ -63,13 +59,13 @@ public sealed partial class TseImportSource
                     Volatile.Read(ref failed),
                     Volatile.Read(ref processed),
                     0,
-                    $"Reference {year}");
+                    $"Reference {year}"
+                );
             });
     }
 
     private async Task<int> ImportReferenceYearAsync(
         int year,
-        int batchSize,
         CancellationToken cancellationToken)
     {
         var files = await acquirer.AcquireCandidatesAsync(year, cancellationToken);
@@ -117,7 +113,8 @@ public sealed partial class TseImportSource
         await reference.UpsertFederationsAsync(
             federations.Values.Select(row =>
                 Federation.Create(row.Number, row.Name, row.Acronym, row.Composition)).ToArray(),
-            cancellationToken);
+            cancellationToken
+        );
 
         logger.LogInformation(
             "Imported {Year} TSE reference data: {Elections} election rounds, {Offices} offices, {Parties} parties, {Federations} federations.",
@@ -144,8 +141,8 @@ public sealed partial class TseImportSource
     private static ParallelOptions ParallelOptionsFor(
         ImportExecutionContext context,
         CancellationToken cancellationToken) => new()
-    {
-        MaxDegreeOfParallelism = Math.Max(1, context.MaxParallelism),
-        CancellationToken = cancellationToken
-    };
+        {
+            MaxDegreeOfParallelism = Math.Max(1, context.MaxParallelism),
+            CancellationToken = cancellationToken
+        };
 }

@@ -10,7 +10,7 @@ internal sealed class PoliticalPartyMap : EntityMapper<PoliticalParty>
     {
         builder.ToTable("PoliticalParties");
 
-        builder.Property(x => x.Acronym).HasMaxLength(20).IsRequired();
+        builder.Property(x => x.Acronym).IsRequired();
         builder.Property(x => x.Name).HasMaxLength(150).IsRequired();
 
         builder.HasIndex(x => new { x.TsePartyNumber, x.Acronym }).IsUnique();

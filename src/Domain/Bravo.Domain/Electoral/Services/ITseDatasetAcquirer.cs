@@ -31,4 +31,5 @@ public interface ITseDatasetAcquirer
 
 public sealed record AcquiredCandidateFile(
     string StateAcronym,
-    AcquiredDataset Dataset);
+    AcquiredDataset Dataset
+);

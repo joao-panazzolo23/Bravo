@@ -13,7 +13,7 @@ internal sealed class ElectoralSectionMap : EntityMapper<ElectoralSection>
         builder.HasIndex(x => new { x.MunicipalityId, x.ZoneId, x.TseSectionNumber }).IsUnique();
         builder.HasIndex(x => x.ZoneId);
 
-        builder.HasOne<Bravo.Domain.Geography.Entities.Municipality>()
+        builder.HasOne<Domain.Geography.Entities.Municipality>()
             .WithMany()
             .HasForeignKey(x => x.MunicipalityId)
             .OnDelete(DeleteBehavior.Restrict);

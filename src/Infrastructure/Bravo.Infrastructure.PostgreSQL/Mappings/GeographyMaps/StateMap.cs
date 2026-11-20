@@ -14,15 +14,12 @@ internal sealed class StateMap : EntityMapper<State>
             .IsRequired();
 
         builder.Property(x => x.Abbreviation)
-            .HasMaxLength(20)
             .IsRequired();
 
         builder.Property(x => x.Name)
-            .HasMaxLength(100)
             .IsRequired();
 
         builder.Property(x => x.Region)
-            .HasMaxLength(20)
             .IsRequired();
 
         builder.HasIndex(x => x.IbgeCode)
@@ -32,4 +29,3 @@ internal sealed class StateMap : EntityMapper<State>
             .IsUnique();
     }
 }
-

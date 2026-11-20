@@ -14,7 +14,6 @@ internal sealed class MunicipalityMap : EntityMapper<Municipality>
             .IsRequired();
 
         builder.Property(x => x.Name)
-            .HasMaxLength(150)
             .IsRequired();
 
         builder.Property(x => x.StateId)
@@ -29,4 +28,3 @@ internal sealed class MunicipalityMap : EntityMapper<Municipality>
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
-

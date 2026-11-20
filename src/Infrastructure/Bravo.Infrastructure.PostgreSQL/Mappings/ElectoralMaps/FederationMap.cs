@@ -11,7 +11,7 @@ internal sealed class FederationMap : EntityMapper<Federation>
         builder.ToTable("Federations");
 
         builder.Property(x => x.Name).HasMaxLength(150).IsRequired();
-        builder.Property(x => x.Acronym).HasMaxLength(20).IsRequired();
+        builder.Property(x => x.Acronym).IsRequired();
         builder.Property(x => x.Composition);
 
         builder.HasIndex(x => x.TseFederationNumber).IsUnique();
