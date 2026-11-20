@@ -27,7 +27,9 @@ internal sealed class CoalitionRepository(NpgsqlDataSource dataSource) : ICoalit
         """;
 
     private const string SelectSql = """
-        SELECT "ElectionRoundId", "OfficeId", "TseCoalitionNumber", "Id" FROM "Coalitions";
+        SELECT "ElectionRoundId", "OfficeId", "TseCoalitionNumber", "Id"
+        FROM "Coalitions"
+        WHERE "StateId" = @StateId;
         """;
 
     public async Task<int> UpsertAsync(
@@ -59,12 +61,14 @@ internal sealed class CoalitionRepository(NpgsqlDataSource dataSource) : ICoalit
     }
 
     public async Task<IReadOnlyDictionary<(Guid RoundId, Guid OfficeId, long Number), Guid>> GetIdsAsync(
+        Guid stateId,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
         var rows = await connection.QueryAsync<CoalitionKeyRow>(new CommandDefinition(
             SelectSql,
+            new { StateId = stateId },
             cancellationToken: cancellationToken));
 
         // A coalition number can repeat across states for the same round and office, so the

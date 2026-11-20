@@ -37,12 +37,12 @@ internal sealed class ElectionRepository(NpgsqlDataSource dataSource) : IElectio
         RETURNING *;
         """;
 
-    private const string SelectElectionSql = """
-        SELECT * FROM "Elections" WHERE "TseElectionCode" = @Code;
+    private const string ListElectionsSql = """
+        SELECT * FROM "Elections";
         """;
 
-    private const string SelectRoundSql = """
-        SELECT * FROM "ElectionRounds" WHERE "ElectionId" = @ElectionId AND "Round" = @Round;
+    private const string ListRoundsSql = """
+        SELECT * FROM "ElectionRounds";
         """;
 
     public async Task<Election> UpsertAsync(Election election, CancellationToken cancellationToken = default)
@@ -87,28 +87,28 @@ internal sealed class ElectionRepository(NpgsqlDataSource dataSource) : IElectio
             cancellationToken: cancellationToken));
     }
 
-    public async Task<Election?> FindByCodeAsync(
-        int tseElectionCode,
+    public async Task<IReadOnlyList<Election>> ListAsync(
         CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
-        return await connection.QuerySingleOrDefaultAsync<Election>(new CommandDefinition(
-            SelectElectionSql,
-            new { Code = tseElectionCode },
+        var rows = await connection.QueryAsync<Election>(new CommandDefinition(
+            ListElectionsSql,
             cancellationToken: cancellationToken));
+
+        return rows.AsList();
     }
 
-    public async Task<ElectionRound?> FindRoundAsync(
-        Guid electionId,
-        short round,
+    public async Task<IReadOnlyList<ElectionRound>> ListRoundsAsync(
         CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
-        return await connection.QuerySingleOrDefaultAsync<ElectionRound>(new CommandDefinition(
-            SelectRoundSql,
-            new { ElectionId = electionId, Round = round },
+        var rows = await connection.QueryAsync<ElectionRound>(new CommandDefinition(
+            ListRoundsSql,
             cancellationToken: cancellationToken));
+
+        return rows.AsList();
     }
 }
+

@@ -1,7 +1,6 @@
 using Bravo.Application.Extensions;
 using Bravo.Infrastructure.Email.Extensions;
 using Bravo.Presentation.Extensions;
-using Bravo.Presentation.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 

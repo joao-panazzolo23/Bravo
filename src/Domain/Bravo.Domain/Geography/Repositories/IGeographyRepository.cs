@@ -24,6 +24,14 @@ public interface IGeographyRepository
     Task<IReadOnlyList<MunicipalityLookup>> GetMunicipalitiesByStateAsync(
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Reads the municipalities of a single state. Callers resolving one state's records must
+    /// use this overload so a nationwide table is never loaded per import scope.
+    /// </summary>
+    Task<IReadOnlyList<MunicipalityLookup>> GetMunicipalitiesByStateAsync(
+        Guid stateId,
+        CancellationToken cancellationToken = default);
+
     Task<int> UpsertStatesAsync(
         IReadOnlyCollection<State> states,
         CancellationToken cancellationToken = default);

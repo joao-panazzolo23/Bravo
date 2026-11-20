@@ -12,14 +12,16 @@ public interface IElectionRepository
         CancellationToken cancellationToken = default
     );
 
-    Task<Election?> FindByCodeAsync(
-        int tseElectionCode,
-        CancellationToken cancellationToken = default
-    );
+    /// <summary>
+    /// Lists every election. The set is small and bounded by the TSE calendar, so import stages
+    /// load it once instead of looking elections up per record.
+    /// </summary>
+    Task<IReadOnlyList<Election>> ListAsync(CancellationToken cancellationToken = default);
 
-    Task<ElectionRound?> FindRoundAsync(
-        Guid electionId,
-        short round,
+    /// <summary>
+    /// Lists every election round, matching <see cref="ListAsync"/>.
+    /// </summary>
+    Task<IReadOnlyList<ElectionRound>> ListRoundsAsync(
         CancellationToken cancellationToken = default
     );
 }

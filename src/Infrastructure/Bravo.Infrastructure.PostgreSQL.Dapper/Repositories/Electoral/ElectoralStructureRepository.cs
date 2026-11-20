@@ -73,16 +73,26 @@ internal sealed class ElectoralStructureRepository(NpgsqlDataSource dataSource)
             "UpdatedAt" = EXCLUDED."UpdatedAt";
         """;
 
+    // Reads are state-scoped. A nationwide scan returns ~1M rows per (year, state) scope, which
+    // is why the state filter is part of the query rather than applied in memory. Sections are
+    // joined through zones because the state id lives on "ElectoralZones", not the section.
     private const string SelectZonesSql = """
-        SELECT "StateId", "TseZoneNumber", "Id" FROM "ElectoralZones";
+        SELECT "StateId", "TseZoneNumber", "Id"
+        FROM "ElectoralZones"
+        WHERE "StateId" = @StateId;
         """;
 
     private const string SelectSectionsSql = """
-        SELECT "MunicipalityId", "ZoneId", "TseSectionNumber", "Id" FROM "ElectoralSections";
+        SELECT s."MunicipalityId", s."ZoneId", s."TseSectionNumber", s."Id"
+        FROM "ElectoralSections" s
+        INNER JOIN "ElectoralZones" z ON z."Id" = s."ZoneId"
+        WHERE z."StateId" = @StateId;
         """;
 
     private const string SelectPollingPlacesSql = """
-        SELECT "StateId", "ZoneId", "TsePollingPlaceNumber", "Id" FROM "PollingPlaces";
+        SELECT "StateId", "ZoneId", "TsePollingPlaceNumber", "Id"
+        FROM "PollingPlaces"
+        WHERE "StateId" = @StateId;
         """;
 
     public Task<int> UpsertZonesAsync(
@@ -145,23 +155,25 @@ internal sealed class ElectoralStructureRepository(NpgsqlDataSource dataSource)
         }), cancellationToken);
 
     public async Task<IReadOnlyDictionary<(Guid StateId, int Number), Guid>> GetZoneIdsAsync(
+        Guid stateId,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
         var rows = await connection.QueryAsync<ZoneRow>(new CommandDefinition(
-            SelectZonesSql, cancellationToken: cancellationToken));
+            SelectZonesSql, new { StateId = stateId }, cancellationToken: cancellationToken));
 
         return rows.ToDictionary(row => (row.StateId, row.TseZoneNumber), row => row.Id);
     }
 
     public async Task<IReadOnlyDictionary<(Guid MunicipalityId, Guid ZoneId, int Number), Guid>> GetSectionIdsAsync(
+        Guid stateId,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
         var rows = await connection.QueryAsync<SectionRow>(new CommandDefinition(
-            SelectSectionsSql, cancellationToken: cancellationToken));
+            SelectSectionsSql, new { StateId = stateId }, cancellationToken: cancellationToken));
 
         return rows.ToDictionary(
             row => (row.MunicipalityId, row.ZoneId, row.TseSectionNumber),
@@ -169,12 +181,13 @@ internal sealed class ElectoralStructureRepository(NpgsqlDataSource dataSource)
     }
 
     public async Task<IReadOnlyDictionary<(Guid StateId, Guid? ZoneId, int Number), Guid>> GetPollingPlaceIdsAsync(
+        Guid stateId,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
         var rows = await connection.QueryAsync<PollingPlaceRow>(new CommandDefinition(
-            SelectPollingPlacesSql, cancellationToken: cancellationToken));
+            SelectPollingPlacesSql, new { StateId = stateId }, cancellationToken: cancellationToken));
 
         return rows.ToDictionary(
             row => (row.StateId, row.ZoneId, row.TsePollingPlaceNumber),

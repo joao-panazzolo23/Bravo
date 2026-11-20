@@ -10,7 +10,8 @@ namespace Bravo.Application.Electoral.Services;
 /// <remarks>
 /// A match is accepted automatically only when the normalised name maps to exactly one
 /// municipality within the same state. Ambiguous or missing matches stay unresolved and are
-/// stored with a low confidence so they can be reviewed.
+/// stored with a low confidence so they can be reviewed. Only the state being imported is
+/// loaded, because a result file never references another state's municipalities.
 /// </remarks>
 public sealed class TseMunicipalityResolver(IGeographyRepository geography)
 {
@@ -20,12 +21,13 @@ public sealed class TseMunicipalityResolver(IGeographyRepository geography)
 
     public async Task<IReadOnlyList<TseMunicipalityCode>> ResolveAsync(
         IEnumerable<(string RawCode, string MunicipalityName, Guid StateId)> observations,
+        Guid stateId,
         int electionYear,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(observations);
 
-        var municipalities = await geography.GetMunicipalitiesByStateAsync(cancellationToken);
+        var municipalities = await geography.GetMunicipalitiesByStateAsync(stateId, cancellationToken);
 
         var byStateAndName = municipalities
             .GroupBy(municipality => municipality.StateId)

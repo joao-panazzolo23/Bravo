@@ -47,7 +47,12 @@ public sealed partial class TseImportSource(
         CancellationToken cancellationToken)
     {
         await ImportReferencesAsync(context, cancellationToken);
-        await ImportCandidatesAsync(context, cancellationToken);
-        await ImportResultsAsync(context, cancellationToken);
+
+        // Elections and rounds are written by the reference stage and are small and bounded, so
+        // one immutable snapshot serves every later stage for the whole job execution.
+        var electionLookup = await TseElectionLookup.LoadAsync(elections, cancellationToken);
+
+        await ImportCandidatesAsync(context, electionLookup, cancellationToken);
+        await ImportResultsAsync(context, electionLookup, cancellationToken);
     }
 }

@@ -3,7 +3,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
-namespace Bravo.Presentation.Telemetry;
+namespace Bravo.Presentation.Extensions;
 
 internal static class OpenTelemetryExtensions
 {

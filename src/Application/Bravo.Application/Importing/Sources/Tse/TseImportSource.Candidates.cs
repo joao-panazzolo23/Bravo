@@ -3,6 +3,7 @@ using Bravo.Domain.Importing.Enums;
 using Bravo.Application.Electoral;
 using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Electoral.Models;
+using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Importing.Models;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +21,7 @@ public sealed partial class TseImportSource
     /// </remarks>
     private async Task ImportCandidatesAsync(
         ImportExecutionContext context,
+        TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
         var years = TseCatalog.CandidateYears;
@@ -46,7 +48,8 @@ public sealed partial class TseImportSource
 
                 try
                 {
-                    var count = await ImportCandidateYearAsync(year, context.BatchSize, token);
+                    var count = await ImportCandidateYearAsync(
+                        year, context.BatchSize, electionLookup, token);
 
                     Interlocked.Add(ref processed, count);
                     Interlocked.Increment(ref completed);
@@ -73,6 +76,7 @@ public sealed partial class TseImportSource
     private async Task<int> ImportCandidateYearAsync(
         int year,
         int batchSize,
+        TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
         var files = await acquirer.AcquireCandidatesAsync(year, cancellationToken);
@@ -86,6 +90,9 @@ public sealed partial class TseImportSource
         var partyIds = await reference.GetPartyIdsAsync(cancellationToken);
         var federationIds = await reference.GetFederationIdsAsync(cancellationToken);
 
+        // Identities are shared by every state file in a year, because a person can register in
+        // more than one state and across rounds. The cache lives for one year, which bounds its
+        // size while keeping reuse high.
         var identities = new Dictionary<string, Guid>(StringComparer.Ordinal);
         var imported = 0;
 
@@ -114,6 +121,7 @@ public sealed partial class TseImportSource
                 partyIds,
                 federationIds,
                 identities,
+                electionLookup,
                 batchSize,
                 cancellationToken);
         }
@@ -132,6 +140,7 @@ public sealed partial class TseImportSource
         IReadOnlyDictionary<(int Number, string Acronym), Guid> partyIds,
         IReadOnlyDictionary<int, Guid> federationIds,
         Dictionary<string, Guid> identities,
+        TseElectionLookup electionLookup,
         int batchSize,
         CancellationToken cancellationToken)
     {
@@ -139,26 +148,28 @@ public sealed partial class TseImportSource
 
         foreach (var group in rows.GroupBy(row => (row.ElectionCode, row.Round)))
         {
-            var election = await elections.FindByCodeAsync(group.Key.ElectionCode, cancellationToken);
-
-            if (election is null)
+            if (!electionLookup.TryGetElectionId(group.Key.ElectionCode, out var electionId))
                 continue;
 
-            var round = await elections.FindRoundAsync(election.Id, group.Key.Round, cancellationToken);
-
-            if (round is null)
+            if (!electionLookup.TryGetRoundId(group.Key.ElectionCode, group.Key.Round, out var roundId))
                 continue;
+
+            var groupRows = group.ToArray();
 
             var coalitionIds = await UpsertCoalitionsAsync(
-                group.ToArray(), round.Id, stateId, officeIds, cancellationToken);
+                groupRows, roundId, stateId, officeIds, cancellationToken);
+
+            // Identities are resolved for the whole group before mapping, so a group costs one
+            // bulk read and at most one bulk write instead of a roundtrip per row.
+            await ResolveIdentitiesAsync(groupRows, identities, cancellationToken);
 
             var buffer = new Dictionary<(string Seq, int Ballot, string Name), Candidate>(batchSize);
 
-            foreach (var row in group)
+            foreach (var row in groupRows)
             {
-                var candidate = await MapCandidateAsync(
-                    row, election.Id, stateId, officeIds, partyIds, federationIds,
-                    coalitionIds, round.Id, identities, cancellationToken);
+                var candidate = MapCandidate(
+                    row, electionId, stateId, officeIds, partyIds, federationIds,
+                    coalitionIds, roundId, identities);
 
                 // The same candidate sequential can repeat within a file; the upsert key is
                 // (election, sequential), so duplicates must be collapsed before writing.
@@ -185,7 +196,7 @@ public sealed partial class TseImportSource
         return imported;
     }
 
-    private async Task<Candidate> MapCandidateAsync(
+    private static Candidate MapCandidate(
         TseCandidateRow row,
         Guid electionId,
         Guid stateId,
@@ -194,8 +205,7 @@ public sealed partial class TseImportSource
         IReadOnlyDictionary<int, Guid> federationIds,
         IReadOnlyDictionary<(Guid, Guid, long), Guid> coalitionIds,
         Guid roundId,
-        Dictionary<string, Guid> identities,
-        CancellationToken cancellationToken)
+        IReadOnlyDictionary<string, Guid> identities)
     {
         var officeId = Resolve(officeIds, row.OfficeCode, $"office {row.OfficeCode}");
 
@@ -222,7 +232,11 @@ public sealed partial class TseImportSource
             coalitionId = resolvedCoalition;
         }
 
-        var identityId = await ResolveIdentityAsync(row, identities, cancellationToken);
+        if (!identities.TryGetValue(CandidateIdentityKey.For(row), out var identityId))
+        {
+            throw new InvalidOperationException(
+                $"Candidate identity for '{row.Name}' was not resolved before mapping.");
+        }
 
         return Candidate.Create(
             electionId,
@@ -273,32 +287,55 @@ public sealed partial class TseImportSource
 
         await coalitions.UpsertAsync(entities, cancellationToken);
 
-        return await coalitions.GetIdsAsync(cancellationToken);
+        return await coalitions.GetIdsAsync(stateId, cancellationToken);
     }
 
     /// <summary>
-    /// Resolves permanent identity by CPF. Rows without a CPF reuse the identity already stored
-    /// for the same name and birth date, so re-running an import does not create a new row.
+    /// Ensures every identity referenced by <paramref name="rows"/> exists, filling the cache.
     /// </summary>
-    private async Task<Guid?> ResolveIdentityAsync(
-        TseCandidateRow row,
+    /// <remarks>
+    /// The cache key comes from <see cref="CandidateIdentityKey"/>, which normalises CPF the
+    /// same way the entity does. Every miss in a group is written with one batched call, so the
+    /// number of identity roundtrips follows the number of groups rather than the number of
+    /// candidates. Brute-force retries are unnecessary because the upsert is keyed on the same
+    /// natural keys the database enforces.
+    /// </remarks>
+    private async Task ResolveIdentitiesAsync(
+        IReadOnlyList<TseCandidateRow> rows,
         Dictionary<string, Guid> cache,
         CancellationToken cancellationToken)
     {
-        var key = string.IsNullOrWhiteSpace(row.Cpf)
-            ? $"name:{row.Name}:{row.BirthDate:yyyy-MM-dd}"
-            : $"cpf:{row.Cpf}";
+        var missing = new Dictionary<string, TseCandidateRow>(StringComparer.Ordinal);
 
-        if (cache.TryGetValue(key, out var cached))
-            return cached;
+        foreach (var row in rows)
+        {
+            var key = CandidateIdentityKey.For(row);
 
-        var identity = await candidates.UpsertIdentityAsync(
-            CandidateIdentity.Create(row.Cpf, row.Name, row.BirthDate),
-            cancellationToken);
+            if (!cache.ContainsKey(key) && !missing.ContainsKey(key))
+                missing[key] = row;
+        }
 
-        cache[key] = identity;
+        if (missing.Count == 0)
+            return;
 
-        return identity;
+        var entities = missing.Values
+            .Select(row => CandidateIdentity.Create(row.Cpf, row.Name, row.BirthDate))
+            .ToArray();
+
+        var persisted = await candidates.UpsertIdentitiesAsync(entities, cancellationToken);
+
+        foreach (var identity in entities)
+        {
+            var key = CandidateIdentityKey.Of(identity.Cpf, identity.FullName, identity.BirthDate);
+
+            if (!persisted.TryGetValue(key, out var id))
+            {
+                throw new InvalidOperationException(
+                    $"Candidate identity upsert did not return an id for '{identity.FullName}'.");
+            }
+
+            cache[key] = id;
+        }
     }
 
     private static Guid Resolve(IReadOnlyDictionary<int, Guid> map, int key, string description)

@@ -19,6 +19,12 @@ internal sealed class GeographyLookup(NpgsqlDataSource dataSource) : IGeographyR
         SELECT "Id", "StateId", "Name", "IbgeCode" FROM "Municipalities";
         """;
 
+    private const string SelectMunicipalitiesByStateSql = """
+        SELECT "Id", "StateId", "Name", "IbgeCode"
+        FROM "Municipalities"
+        WHERE "StateId" = @StateId;
+        """;
+
     private const string UpsertStatesSql = """
         INSERT INTO "States" ("Id", "IbgeCode", "Abbreviation", "Name", "Region", "CreatedAt", "UpdatedAt")
         SELECT record."Id", record."IbgeCode", record."Abbreviation", record."Name",
@@ -80,6 +86,20 @@ internal sealed class GeographyLookup(NpgsqlDataSource dataSource) : IGeographyR
 
         var rows = await connection.QueryAsync<MunicipalityLookup>(new CommandDefinition(
             SelectMunicipalitiesFullSql,
+            cancellationToken: cancellationToken));
+
+        return rows.AsList();
+    }
+
+    public async Task<IReadOnlyList<MunicipalityLookup>> GetMunicipalitiesByStateAsync(
+        Guid stateId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+
+        var rows = await connection.QueryAsync<MunicipalityLookup>(new CommandDefinition(
+            SelectMunicipalitiesByStateSql,
+            new { StateId = stateId },
             cancellationToken: cancellationToken));
 
         return rows.AsList();

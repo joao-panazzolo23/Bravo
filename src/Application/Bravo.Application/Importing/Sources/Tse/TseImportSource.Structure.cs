@@ -9,14 +9,17 @@ namespace Bravo.Application.Importing.Sources.Tse;
 /// </summary>
 /// <remarks>
 /// Structure is round-independent, so it is ensured once per (year, state) file. Every upsert is
-/// keyed by a natural key, which is what makes re-running an import safe.
+/// keyed by a natural key, which is what makes re-running an import safe. All reads are scoped
+/// to the state being imported, and the final maps are returned so the result resolver can
+/// reuse them instead of reading the tables again.
 /// </remarks>
 public sealed partial class TseImportSource
 {
-    private async Task EnsureStructureAsync(
+    private async Task<TseStructureIds> EnsureStructureAsync(
         IReadOnlyList<TseSectionResultRow> rows,
         Guid stateId,
         IReadOnlyDictionary<string, Guid?> municipalityIds,
+        TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
         var resolved = rows
@@ -26,14 +29,20 @@ public sealed partial class TseImportSource
             .ToArray();
 
         if (resolved.Length == 0)
-            return;
+            return new TseStructureIds(
+                new Dictionary<(Guid, int), Guid>(),
+                new Dictionary<(Guid, Guid, int), Guid>(),
+                new Dictionary<(Guid, Guid?, int), Guid>());
 
         var zoneIds = await EnsureZonesAsync(resolved, stateId, cancellationToken);
         var sectionIds = await EnsureSectionsAsync(resolved, stateId, zoneIds, cancellationToken);
         var placeIds = await EnsurePollingPlacesAsync(resolved, stateId, zoneIds, cancellationToken);
 
         await EnsureAssignmentsAsync(
-            rows, stateId, municipalityIds, zoneIds, sectionIds, placeIds, cancellationToken);
+            rows, stateId, municipalityIds, zoneIds, sectionIds, placeIds, electionLookup,
+            cancellationToken);
+
+        return new TseStructureIds(zoneIds, sectionIds, placeIds);
     }
 
     private async Task<IReadOnlyDictionary<(Guid, int), Guid>> EnsureZonesAsync(
@@ -41,7 +50,7 @@ public sealed partial class TseImportSource
         Guid stateId,
         CancellationToken cancellationToken)
     {
-        var zoneIds = await structure.GetZoneIdsAsync(cancellationToken);
+        var zoneIds = await structure.GetZoneIdsAsync(stateId, cancellationToken);
 
         var newZones = resolved
             .GroupBy(item => item.Row.ZoneNumber)
@@ -57,7 +66,7 @@ public sealed partial class TseImportSource
 
         await structure.UpsertZonesAsync(newZones, cancellationToken);
 
-        return await structure.GetZoneIdsAsync(cancellationToken);
+        return await structure.GetZoneIdsAsync(stateId, cancellationToken);
     }
 
     private async Task<IReadOnlyDictionary<(Guid, Guid, int), Guid>> EnsureSectionsAsync(
@@ -66,7 +75,7 @@ public sealed partial class TseImportSource
         IReadOnlyDictionary<(Guid, int), Guid> zoneIds,
         CancellationToken cancellationToken)
     {
-        var sectionIds = await structure.GetSectionIdsAsync(cancellationToken);
+        var sectionIds = await structure.GetSectionIdsAsync(stateId, cancellationToken);
 
         var newSections = resolved
             .Select(item => (item.MunicipalityId, item.Row.ZoneNumber, item.Row.SectionNumber))
@@ -86,7 +95,7 @@ public sealed partial class TseImportSource
 
         await structure.UpsertSectionsAsync(newSections, cancellationToken);
 
-        return await structure.GetSectionIdsAsync(cancellationToken);
+        return await structure.GetSectionIdsAsync(stateId, cancellationToken);
     }
 
     private async Task<IReadOnlyDictionary<(Guid, Guid?, int), Guid>> EnsurePollingPlacesAsync(
@@ -95,7 +104,7 @@ public sealed partial class TseImportSource
         IReadOnlyDictionary<(Guid, int), Guid> zoneIds,
         CancellationToken cancellationToken)
     {
-        var placeIds = await structure.GetPollingPlaceIdsAsync(cancellationToken);
+        var placeIds = await structure.GetPollingPlaceIdsAsync(stateId, cancellationToken);
 
         var newPlaces = resolved
             .Select(item => (item.Row, item.MunicipalityId, item.Row.ZoneNumber, item.Row.PollingPlaceNumber))
@@ -120,7 +129,7 @@ public sealed partial class TseImportSource
 
         await structure.UpsertPollingPlacesAsync(newPlaces, cancellationToken);
 
-        return await structure.GetPollingPlaceIdsAsync(cancellationToken);
+        return await structure.GetPollingPlaceIdsAsync(stateId, cancellationToken);
     }
 
     private async Task EnsureAssignmentsAsync(
@@ -130,22 +139,14 @@ public sealed partial class TseImportSource
         IReadOnlyDictionary<(Guid, int), Guid> zoneIds,
         IReadOnlyDictionary<(Guid, Guid, int), Guid> sectionIds,
         IReadOnlyDictionary<(Guid, Guid?, int), Guid> placeIds,
+        TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
         var assignments = new Dictionary<(Guid RoundId, Guid SectionId), PollingPlaceSection>();
 
         foreach (var roundGroup in rows.GroupBy(row => (row.ElectionCode, row.Round)))
         {
-            var election = await elections.FindByCodeAsync(
-                roundGroup.Key.ElectionCode, cancellationToken);
-
-            if (election is null)
-                continue;
-
-            var round = await elections.FindRoundAsync(
-                election.Id, roundGroup.Key.Round, cancellationToken);
-
-            if (round is null)
+            if (!electionLookup.TryGetRoundId(roundGroup.Key.ElectionCode, roundGroup.Key.Round, out var roundId))
                 continue;
 
             foreach (var row in roundGroup)
@@ -156,8 +157,8 @@ public sealed partial class TseImportSource
                 if (resolved is not { } ids)
                     continue;
 
-                assignments[(round.Id, ids.SectionId)] =
-                    PollingPlaceSection.Create(round.Id, ids.PlaceId, ids.SectionId);
+                assignments[(roundId, ids.SectionId)] =
+                    PollingPlaceSection.Create(roundId, ids.PlaceId, ids.SectionId);
             }
         }
 

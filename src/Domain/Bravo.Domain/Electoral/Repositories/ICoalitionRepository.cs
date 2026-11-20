@@ -10,8 +10,12 @@ public interface ICoalitionRepository
         CancellationToken cancellationToken = default
     );
 
-    //todo: tuple = antipattern
+    /// <summary>
+    /// Reads the coalition identifiers for one state. Coalition numbers only repeat within a
+    /// state, so a caller importing one state must never scan the whole table.
+    /// </summary>
     Task<IReadOnlyDictionary<(Guid RoundId, Guid OfficeId, long Number), Guid>> GetIdsAsync(
+        Guid stateId,
         CancellationToken cancellationToken = default
     );
 }

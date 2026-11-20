@@ -23,6 +23,7 @@ public sealed partial class TseImportSource
     /// </remarks>
     private async Task ImportResultsAsync(
         ImportExecutionContext context,
+        TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
         var pairs = TseCatalog.ResultYears
@@ -52,7 +53,7 @@ public sealed partial class TseImportSource
                 try
                 {
                     var count = await ImportResultScopeAsync(
-                        pair.Year, pair.State, context, token);
+                        pair.Year, pair.State, electionLookup, context, token);
 
                     Interlocked.Add(ref processed, count);
                     Interlocked.Increment(ref completed);
@@ -78,6 +79,7 @@ public sealed partial class TseImportSource
     private async Task<int> ImportResultScopeAsync(
         int year,
         string state,
+        TseElectionLookup electionLookup,
         ImportExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -90,7 +92,7 @@ public sealed partial class TseImportSource
         try
         {
             var imported = await ImportResultRowsAsync(
-                year, state, dataset, version, context.BatchSize, cancellationToken);
+                year, state, dataset, version, electionLookup, context.BatchSize, cancellationToken);
 
             await datasetVersions.CompleteAsync(version.Id, cancellationToken);
 
@@ -111,6 +113,7 @@ public sealed partial class TseImportSource
         string state,
         AcquiredDataset dataset,
         DatasetVersion version,
+        TseElectionLookup electionLookup,
         int batchSize,
         CancellationToken cancellationToken)
     {
@@ -126,27 +129,29 @@ public sealed partial class TseImportSource
         var officeIds = await reference.GetOfficeIdsAsync(cancellationToken);
         var partyIds = await reference.GetPartyIdsAsync(cancellationToken);
 
-        // Structure is round-independent, so it is ensured once per file.
-        await EnsureStructureAsync(rows, stateId, municipalityIds, cancellationToken);
-
-        var zoneIds = await structure.GetZoneIdsAsync(cancellationToken);
-        var sectionIds = await structure.GetSectionIdsAsync(cancellationToken);
+        // Structure is round-independent, so it is ensured once per file. The scoped reads are
+        // shared between ensuring structure and resolving rows, so each map is fetched once.
+        var structureIds = await EnsureStructureAsync(
+            rows, stateId, municipalityIds, electionLookup, cancellationToken);
 
         var partyByNumber = partyIds
             .GroupBy(entry => entry.Key.Number)
             .ToDictionary(group => group.Key, group => group.First().Value);
 
-        var rounds = new Dictionary<int, Guid>();
-        var candidateCache = new Dictionary<Guid, IReadOnlyDictionary<string, Guid>>();
+        // Candidate maps are fetched once per (election, state) file before the row loop, so
+        // no database access happens while resolving individual records.
+        var candidateCache = await LoadCandidateIdsAsync(
+            rows, stateId, electionLookup, cancellationToken);
+
         var buffer = NewResultBuffer();
 
         var imported = 0;
 
         foreach (var row in rows)
         {
-            var resolved = await ResolveResultRowAsync(
-                row, stateId, municipalityIds, zoneIds, sectionIds, officeIds,
-                partyByNumber, rounds, candidateCache, cancellationToken);
+            var resolved = ResolveResultRow(
+                row, stateId, municipalityIds, structureIds, officeIds,
+                partyByNumber, electionLookup, candidateCache);
 
             if (resolved is not { } key)
                 continue;
@@ -188,23 +193,59 @@ public sealed partial class TseImportSource
     }
 
     /// <summary>
+    /// Loads the candidate-sequential map for every election in the file that casts nominal
+    /// votes, once each.
+    /// </summary>
+    /// <remarks>
+    /// Nominal results need candidate identifiers, and a file spans a bounded set of elections.
+    /// Fetching them up front keeps record resolution free of database access while issuing at
+    /// most one query per distinct election with nominal votes.
+    /// </remarks>
+    private async Task<IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, Guid>>> LoadCandidateIdsAsync(
+        IReadOnlyList<TseSectionResultRow> rows,
+        Guid stateId,
+        TseElectionLookup electionLookup,
+        CancellationToken cancellationToken)
+    {
+        var electionCodes = rows
+            .Where(row => TseVoteClassifier.Classify(row.BallotNumber, row.CandidateSequential)
+                          == VoteType.Nominal)
+            .Select(row => row.ElectionCode)
+            .Distinct();
+
+        var loaded = new Dictionary<Guid, IReadOnlyDictionary<string, Guid>>();
+
+        foreach (var code in electionCodes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!electionLookup.TryGetElectionId(code, out var electionId))
+                continue;
+
+            loaded[electionId] = await candidates.GetCandidateIdsAsync(
+                electionId, stateId, cancellationToken);
+        }
+
+        return loaded;
+    }
+
+    /// <summary>
     /// Maps one source row to its result key, or null when a reference is genuinely missing.
     /// </summary>
     /// <remarks>
     /// The caller accumulates votes per key, so duplicates inside one file are summed rather
-    /// than overwritten.
+    /// than overwritten. Every reference comes from a map loaded before the loop, so this
+    /// method never touches the database.
     /// </remarks>
-    private async Task<(Guid RoundId, Guid SectionId, Guid OfficeId, VoteType Type, Guid? CandidateId, Guid? PartyId, int Ballot)?> ResolveResultRowAsync(
+    private (Guid RoundId, Guid SectionId, Guid OfficeId, VoteType Type, Guid? CandidateId, Guid? PartyId, int Ballot)? ResolveResultRow(
         TseSectionResultRow row,
         Guid stateId,
         IReadOnlyDictionary<string, Guid?> municipalityIds,
-        IReadOnlyDictionary<(Guid, int), Guid> zoneIds,
-        IReadOnlyDictionary<(Guid, Guid, int), Guid> sectionIds,
+        TseStructureIds structureIds,
         IReadOnlyDictionary<int, Guid> officeIds,
         IReadOnlyDictionary<int, Guid> partyByNumber,
-        Dictionary<int, Guid> rounds,
-        Dictionary<Guid, IReadOnlyDictionary<string, Guid>> candidateCache,
-        CancellationToken cancellationToken)
+        TseElectionLookup electionLookup,
+        IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, Guid>> candidateIds)
     {
         if (!municipalityIds.TryGetValue(row.TseMunicipalityCode, out var municipalityId)
             || municipalityId is null)
@@ -212,44 +253,30 @@ public sealed partial class TseImportSource
             return null;
         }
 
-        if (!zoneIds.TryGetValue((stateId, row.ZoneNumber), out var zoneId))
+        if (!structureIds.ZoneIds.TryGetValue((stateId, row.ZoneNumber), out var zoneId))
             return null;
 
-        if (!sectionIds.TryGetValue((municipalityId.Value, zoneId, row.SectionNumber), out var sectionId))
+        if (!structureIds.SectionIds.TryGetValue(
+                (municipalityId.Value, zoneId, row.SectionNumber), out var sectionId))
+        {
             return null;
+        }
 
         if (!officeIds.TryGetValue(row.OfficeCode, out var officeId))
             return null;
 
-        var election = await elections.FindByCodeAsync(row.ElectionCode, cancellationToken);
-
-        if (election is null)
+        if (!electionLookup.TryGetElectionId(row.ElectionCode, out var electionId))
             return null;
 
-        if (!rounds.TryGetValue(row.ElectionCode, out var roundId))
-        {
-            var round = await elections.FindRoundAsync(election.Id, row.Round, cancellationToken);
-
-            if (round is null)
-                return null;
-
-            roundId = round.Id;
-            rounds[row.ElectionCode] = roundId;
-        }
+        if (!electionLookup.TryGetRoundId(row.ElectionCode, row.Round, out var roundId))
+            return null;
 
         var voteType = TseVoteClassifier.Classify(row.BallotNumber, row.CandidateSequential);
 
         if (voteType == VoteType.Nominal)
         {
-            if (!candidateCache.TryGetValue(election.Id, out var candidateIds))
-            {
-                candidateIds = await candidates.GetCandidateIdsAsync(
-                    election.Id, stateId, cancellationToken);
-
-                candidateCache[election.Id] = candidateIds;
-            }
-
-            return candidateIds.TryGetValue(row.CandidateSequential!, out var candidateId)
+            return candidateIds.TryGetValue(electionId, out var bySequential)
+                   && bySequential.TryGetValue(row.CandidateSequential!, out var candidateId)
                 ? (roundId, sectionId, officeId, voteType, candidateId, null, row.BallotNumber)
                 : null;
         }
@@ -307,7 +334,8 @@ public sealed partial class TseImportSource
             .Distinct()
             .ToArray();
 
-        var resolved = await municipalityResolver.ResolveAsync(observations, year, cancellationToken);
+        var resolved = await municipalityResolver.ResolveAsync(
+            observations, stateId, year, cancellationToken);
 
         await municipalityCodes.UpsertAsync(resolved, cancellationToken);
 

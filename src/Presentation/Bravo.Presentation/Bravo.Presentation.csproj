@@ -8,6 +8,7 @@
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.16.0" />
+
 		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />
 		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.21.0" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.21.0" />

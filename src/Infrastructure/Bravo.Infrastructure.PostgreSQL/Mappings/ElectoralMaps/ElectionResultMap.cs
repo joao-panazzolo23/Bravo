@@ -27,6 +27,11 @@ internal sealed class ElectionResultMap : EntityMapper<ElectionResult>
         builder.Property(x => x.TseBallotNumber).IsRequired();
         builder.Property(x => x.Votes).IsRequired();
 
+        // PostgreSQL treats NULLs as distinct in a plain unique index, so without NULLS NOT
+        // DISTINCT the upsert never conflicts for party votes (PartyId set, CandidateId null)
+        // and blank votes (both null). Every re-execution then inserted a second copy of those
+        // rows, doubling vote totals. NULLS NOT DISTINCT is the native way to make the index
+        // match the identity the import actually upserts on.
         builder.HasIndex(x => new
         {
             x.ElectionRoundId,
@@ -37,7 +42,9 @@ internal sealed class ElectionResultMap : EntityMapper<ElectionResult>
             x.PartyId,
             x.TseBallotNumber,
             x.DatasetVersionId
-        }).IsUnique();
+        })
+        .IsUnique()
+        .AreNullsDistinct(false);
 
         builder.HasIndex(x => new { x.ElectionRoundId, x.SectionId, x.OfficeId });
         builder.HasIndex(x => x.DatasetVersionId);

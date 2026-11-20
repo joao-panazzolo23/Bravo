@@ -263,6 +263,8 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .IsUnique()
                         .HasFilter("\"Cpf\" IS NULL");
 
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("FullName", "BirthDate"), false);
+
                     b.ToTable("CandidateIdentities", (string)null);
                 });
 
@@ -409,6 +411,8 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
                     b.HasIndex("ElectionRoundId", "SectionId", "OfficeId", "VoteType", "CandidateId", "PartyId", "TseBallotNumber", "DatasetVersionId")
                         .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ElectionRoundId", "SectionId", "OfficeId", "VoteType", "CandidateId", "PartyId", "TseBallotNumber", "DatasetVersionId"), false);
 
                     b.ToTable("ElectionResults", null, t =>
                         {

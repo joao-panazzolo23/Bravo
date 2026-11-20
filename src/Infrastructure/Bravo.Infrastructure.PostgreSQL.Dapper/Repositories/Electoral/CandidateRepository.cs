@@ -10,21 +10,29 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
 {
     private const string UpsertIdentitySql = """
         INSERT INTO "CandidateIdentities" ("Id", "Cpf", "FullName", "BirthDate", "CreatedAt", "UpdatedAt")
-        VALUES (@Id, @Cpf, @FullName, @BirthDate, @CreatedAt, @UpdatedAt)
+        SELECT record."Id", record."Cpf", record."FullName", record."BirthDate",
+               record."CreatedAt", record."UpdatedAt"
+        FROM jsonb_to_recordset(@Records::jsonb) AS record(
+            "Id" uuid, "Cpf" varchar(11), "FullName" varchar(200), "BirthDate" date,
+            "CreatedAt" timestamp with time zone, "UpdatedAt" timestamp with time zone)
         ON CONFLICT ("Cpf") DO UPDATE SET
             "FullName" = EXCLUDED."FullName",
             "BirthDate" = EXCLUDED."BirthDate",
             "UpdatedAt" = EXCLUDED."UpdatedAt"
-        RETURNING "Id";
+        RETURNING "Id", "Cpf", "FullName", "BirthDate";
         """;
 
     private const string UpsertIdentityWithoutCpfSql = """
         INSERT INTO "CandidateIdentities" ("Id", "Cpf", "FullName", "BirthDate", "CreatedAt", "UpdatedAt")
-        VALUES (@Id, NULL, @FullName, @BirthDate, @CreatedAt, @UpdatedAt)
+        SELECT record."Id", NULL, record."FullName", record."BirthDate",
+               record."CreatedAt", record."UpdatedAt"
+        FROM jsonb_to_recordset(@Records::jsonb) AS record(
+            "Id" uuid, "FullName" varchar(200), "BirthDate" date,
+            "CreatedAt" timestamp with time zone, "UpdatedAt" timestamp with time zone)
         ON CONFLICT ("FullName", "BirthDate") WHERE "Cpf" IS NULL DO UPDATE SET
             "FullName" = EXCLUDED."FullName",
             "UpdatedAt" = EXCLUDED."UpdatedAt"
-        RETURNING "Id";
+        RETURNING "Id", "Cpf", "FullName", "BirthDate";
         """;
 
     private const string UpsertCandidatesSql = """
@@ -76,27 +84,65 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
           AND "StateId" = @StateId;
         """;
 
-    public async Task<Guid> UpsertIdentityAsync(
-        CandidateIdentity identity,
+    public async Task<IReadOnlyDictionary<string, Guid>> UpsertIdentitiesAsync(
+        IReadOnlyCollection<CandidateIdentity> identities,
         CancellationToken cancellationToken = default)
     {
+        if (identities.Count == 0)
+            return new Dictionary<string, Guid>(StringComparer.Ordinal);
+
+        var withCpf = identities.Where(identity => identity.Cpf is not null).ToArray();
+        var withoutCpf = identities.Where(identity => identity.Cpf is null).ToArray();
+
+        var result = new Dictionary<string, Guid>(identities.Count, StringComparer.Ordinal);
+
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
-        var sql = identity.Cpf is null ? UpsertIdentityWithoutCpfSql : UpsertIdentitySql;
+        if (withCpf.Length > 0)
+        {
+            var rows = await InsertIdentitiesAsync(connection, UpsertIdentitySql, withCpf, cancellationToken);
 
-        return await connection.QuerySingleAsync<Guid>(new CommandDefinition(
-            sql,
-            new
-            {
-                identity.Id,
-                identity.Cpf,
-                identity.FullName,
-                identity.BirthDate,
-                identity.CreatedAt,
-                identity.UpdatedAt
-            },
-            cancellationToken: cancellationToken));
+            foreach (var row in rows)
+                result[CandidateIdentityKey.Of(row.Cpf, row.FullName, row.BirthDate)] = row.Id;
+        }
+
+        if (withoutCpf.Length > 0)
+        {
+            var rows = await InsertIdentitiesAsync(
+                connection, UpsertIdentityWithoutCpfSql, withoutCpf, cancellationToken);
+
+            foreach (var row in rows)
+                result[CandidateIdentityKey.Of(null, row.FullName, row.BirthDate)] = row.Id;
+        }
+
+        return result;
     }
+
+    private static async Task<IReadOnlyList<IdentityRow>> InsertIdentitiesAsync(
+        NpgsqlConnection connection,
+        string sql,
+        IReadOnlyCollection<CandidateIdentity> identities,
+        CancellationToken cancellationToken)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(identities.Select(identity => new
+        {
+            identity.Id,
+            identity.Cpf,
+            identity.FullName,
+            identity.BirthDate,
+            identity.CreatedAt,
+            identity.UpdatedAt
+        }));
+
+        var rows = await connection.QueryAsync<IdentityRow>(new CommandDefinition(
+            sql,
+            new { Records = payload },
+            cancellationToken: cancellationToken));
+
+        return rows.AsList();
+    }
+
+    private sealed record IdentityRow(Guid Id, string? Cpf, string FullName, DateOnly? BirthDate);
 
     public async Task<int> UpsertCandidatesAsync(
         IReadOnlyCollection<Candidate> candidates,
