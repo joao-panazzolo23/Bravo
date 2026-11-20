@@ -13,4 +13,5 @@ public sealed record ImportJobProgress(
     int FailedOperations,
     long ProcessedRecords,
     long FailedRecords,
-    string? CurrentOperation);
+    string? CurrentOperation
+);

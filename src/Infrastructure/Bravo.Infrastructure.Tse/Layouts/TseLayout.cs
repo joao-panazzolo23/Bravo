@@ -2,7 +2,7 @@ using System.Text;
 
 namespace Bravo.Infrastructure.Tse.Layouts;
 
-public sealed record TseLayout(
+internal sealed record TseLayout(
     string Version,
     char Delimiter,
     char Quote,
