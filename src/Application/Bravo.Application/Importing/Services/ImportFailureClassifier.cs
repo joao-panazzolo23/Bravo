@@ -4,6 +4,10 @@ using Bravo.Application.Importing.Exceptions;
 
 namespace Bravo.Application.Importing.Services;
 
+/// <summary>
+/// Decides whether a failed import attempt is worth retrying. Transient failures are retried
+/// until the job's attempt budget is spent; everything else fails immediately.
+/// </summary>
 public static class ImportFailureClassifier
 {
     public static bool IsTransient(Exception exception)
@@ -11,7 +15,6 @@ public static class ImportFailureClassifier
         {
             ImportTransientException => true,
             ImportPermanentException => false,
-            ImportLeaseLostException => false,
             HttpRequestException => true,
             SocketException => true,
             DbException databaseException => databaseException.IsTransient,

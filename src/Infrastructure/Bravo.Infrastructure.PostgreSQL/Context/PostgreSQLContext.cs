@@ -18,7 +18,6 @@ public class PostgreSQLContext(DbContextOptions<PostgreSQLContext> options) : Db
     public DbSet<Role> Roles { get; set; }
     public DbSet<RolePermission> RolePermissions { get; set; }
     public DbSet<ImportJob> ImportJobs { get; set; }
-    public DbSet<ImportWorkUnit> ImportWorkUnits { get; set; }
     public DbSet<ImportFailedRecord> ImportFailedRecords { get; set; }
     public DbSet<ImportDataset> ImportDatasets { get; set; }
     public DbSet<DatasetVersion> DatasetVersions { get; set; }

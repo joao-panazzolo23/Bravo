@@ -262,6 +262,10 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.HasIndex("Cpf")
                         .IsUnique();
 
+                    b.HasIndex("FullName", "BirthDate")
+                        .IsUnique()
+                        .HasFilter("\"Cpf\" IS NULL");
+
                     b.ToTable("CandidateIdentities", (string)null);
                 });
 
@@ -1030,14 +1034,11 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("WorkUnitId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("JobId", "CreatedAt");
 
-                    b.HasIndex("WorkUnitId", "SourceIdentifier")
+                    b.HasIndex("JobId", "SourceIdentifier")
                         .IsUnique();
 
                     b.ToTable("ImportFailedRecords", (string)null);
@@ -1049,80 +1050,33 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
                     b.Property<int>("BatchSize")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("CompletedOperations")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CurrentOperation")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("FailedOperations")
+                        .HasColumnType("integer");
 
                     b.Property<string>("LastError")
                         .HasColumnType("text");
 
                     b.Property<int>("LeaseDurationSeconds")
                         .HasColumnType("integer");
-
-                    b.Property<int>("MaxAttempts")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<long>("TotalFailedRecords")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("TotalProcessedRecords")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Status", "CreatedAt");
-
-                    b.ToTable("ImportJobs", (string)null);
-                });
-
-            modelBuilder.Entity("Bravo.Domain.Importing.Entities.ImportWorkUnit", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Cursor")
-                        .HasColumnType("text");
-
-                    b.Property<long>("FailedRecords")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("FencingToken")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("InsertedRecords")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid>("JobId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LastError")
-                        .HasColumnType("text");
 
                     b.Property<DateTime?>("LeaseExpiresAt")
                         .HasColumnType("timestamp with time zone");
@@ -1131,17 +1085,27 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MaxParallelism")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("NextAttemptAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("ProcessedRecords")
-                        .HasColumnType("bigint");
 
                     b.Property<DateTime?>("ProgressUpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("RejectedRecords")
-                        .HasColumnType("bigint");
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Stage")
                         .IsRequired()
@@ -1156,32 +1120,33 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<long?>("TotalRecords")
+                    b.Property<long>("TotalFailedRecords")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("UnitKey")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                    b.Property<int>("TotalOperations")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("TotalProcessedRecords")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("UpdatedRecords")
-                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
                     b.HasIndex("LeaseExpiresAt")
                         .HasFilter("\"Status\" = 'Running'");
 
-                    b.HasIndex("JobId", "UnitKey")
-                        .IsUnique();
+                    b.HasIndex("NextAttemptAt")
+                        .HasFilter("\"Status\" = 'Pending'");
 
-                    b.HasIndex("JobId", "Status", "NextAttemptAt", "CreatedAt")
+                    b.HasIndex("Source", "Scope")
+                        .IsUnique()
                         .HasFilter("\"Status\" IN ('Pending', 'Running')");
 
-                    b.ToTable("ImportWorkUnits", (string)null);
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("ImportJobs", (string)null);
                 });
 
             modelBuilder.Entity("Bravo.Domain.Users.Entities.User", b =>
@@ -1548,21 +1513,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                 });
 
             modelBuilder.Entity("Bravo.Domain.Importing.Entities.ImportFailedRecord", b =>
-                {
-                    b.HasOne("Bravo.Domain.Importing.Entities.ImportJob", null)
-                        .WithMany()
-                        .HasForeignKey("JobId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Bravo.Domain.Importing.Entities.ImportWorkUnit", null)
-                        .WithMany()
-                        .HasForeignKey("WorkUnitId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Bravo.Domain.Importing.Entities.ImportWorkUnit", b =>
                 {
                     b.HasOne("Bravo.Domain.Importing.Entities.ImportJob", null)
                         .WithMany()

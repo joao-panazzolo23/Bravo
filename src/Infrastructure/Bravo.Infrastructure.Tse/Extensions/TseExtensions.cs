@@ -1,5 +1,6 @@
 using Bravo.Domain.Electoral.Services;
 using Bravo.Application.Electoral.Services;
+using Bravo.Application.Importing.Sources.Tse;
 using Bravo.Domain.Importing.Services;
 using Bravo.Infrastructure.Tse.Acquisition;
 using Bravo.Infrastructure.Tse.Downloads;
@@ -44,9 +45,7 @@ public static class TseExtensions
                 .AddSingleton<ITseCandidateReader, TseCandidateReader>()
                 .AddSingleton<ITseSectionResultReader, TseSectionResultReader>();
 
-        return services.AddScoped<IImportPipeline, TseReferencePipeline>()
-                       .AddScoped<IImportPipeline, TseCandidatePipeline>()
-                       .AddScoped<IImportPipeline, TseResultsPipeline>()
+        return services.AddScoped<IImportSource, TseImportSource>()
                        .AddScoped<DatasetVersionService>()
                        .AddScoped<TseMunicipalityResolver>()
                        .AddScoped<TseSyntheticScopeSeeder>();

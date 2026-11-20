@@ -11,4 +11,5 @@ public sealed record ImportProgressRecords(
     long Updated,
     long Rejected,
     long Failed,
-    double? Percentage);
+    double? Percentage
+);

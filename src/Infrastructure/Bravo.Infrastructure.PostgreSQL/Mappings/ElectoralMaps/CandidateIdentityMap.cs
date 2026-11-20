@@ -15,5 +15,11 @@ internal sealed class CandidateIdentityMap : EntityMapper<CandidateIdentity>
         builder.Property(x => x.BirthDate);
 
         builder.HasIndex(x => x.Cpf).IsUnique();
+
+        // A candidate without a CPF is identified by name and birth date, so a re-executed
+        // import must map to the same row instead of inserting another one.
+        builder.HasIndex(x => new { x.FullName, x.BirthDate })
+            .IsUnique()
+            .HasFilter("\"Cpf\" IS NULL");
     }
 }

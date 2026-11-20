@@ -1,52 +1,41 @@
 using Bravo.Application.Importing.Commands;
-using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.ViewModels;
-using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Enums;
+using Bravo.Domain.Importing.Repositories;
 using Bravo.Shared.Result;
 using Mediator;
-using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Application.Importing.Handlers;
 
-public sealed class RetryImportJobHandler(
-    IImportJobRepository jobs,
-    IImportWorkUnitRepository workUnits)
+/// <summary>
+/// Retries a failed job by re-executing the whole source. Every stage is upsert-based, so a
+/// second run is safe by construction; no per-unit bookkeeping needs to be reconstructed.
+/// </summary>
+public sealed class RetryImportJobHandler(IImportJobRepository jobs)
     : ICommandHandler<RetryImportJobCommand, Result<ImportJobCreatedViewModel>>
 {
     public async ValueTask<Result<ImportJobCreatedViewModel>> Handle(
         RetryImportJobCommand command,
         CancellationToken cancellationToken)
     {
-        var original = await jobs.GetAsync(command.JobId, cancellationToken);
+        var job = await jobs.GetAsync(command.JobId, cancellationToken);
 
-        if (original is null)
+        if (job is null)
             return Result<ImportJobCreatedViewModel>.NotFound(message: "Import job not found.");
 
-        if (original.Status != ImportJobStatus.Failed)
-            return Result<ImportJobCreatedViewModel>.BadRequest(message: "Only failed import jobs can be retried.");
+        if (job.Status != ImportJobStatus.Failed)
+        {
+            return Result<ImportJobCreatedViewModel>.BadRequest(
+                message: "Only failed import jobs can be retried.");
+        }
 
-        var failedKeys = await workUnits.GetFailedKeysAsync(command.JobId, cancellationToken);
-
-        if (failedKeys.Count == 0)
-            return Result<ImportJobCreatedViewModel>.BadRequest(message: "Import job has no failed work units.");
-
-        var job = ImportJob.Create(
-            original.BatchSize,
-            original.MaxAttempts,
-            original.LeaseDurationSeconds);
-
-        var units = failedKeys
-            .Select(key => ImportWorkUnit.Create(job.Id, key))
-            .ToArray();
-
-        if (!await jobs.CreateAsync(job, units, cancellationToken))
+        if (!await jobs.RequeueAsync(command.JobId, cancellationToken))
         {
             return Result<ImportJobCreatedViewModel>.Conflict(
-                message: "An import job is already running for the requested scope.");
+                message: $"An import job for '{job.Source}' and scope '{job.Scope}' is already pending or running.");
         }
 
         return Result<ImportJobCreatedViewModel>.Created(
-            new ImportJobCreatedViewModel(job.Id, job.Status.ToString(), failedKeys));
+            new ImportJobCreatedViewModel(job.Id, ImportJobStatus.Pending.ToString(), []));
     }
 }

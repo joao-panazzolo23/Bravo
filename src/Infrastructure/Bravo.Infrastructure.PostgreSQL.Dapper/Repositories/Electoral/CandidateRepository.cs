@@ -18,9 +18,12 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
         RETURNING "Id";
         """;
 
-    private const string InsertIdentityWithoutCpfSql = """
+    private const string UpsertIdentityWithoutCpfSql = """
         INSERT INTO "CandidateIdentities" ("Id", "Cpf", "FullName", "BirthDate", "CreatedAt", "UpdatedAt")
         VALUES (@Id, NULL, @FullName, @BirthDate, @CreatedAt, @UpdatedAt)
+        ON CONFLICT ("FullName", "BirthDate") WHERE "Cpf" IS NULL DO UPDATE SET
+            "FullName" = EXCLUDED."FullName",
+            "UpdatedAt" = EXCLUDED."UpdatedAt"
         RETURNING "Id";
         """;
 
@@ -79,7 +82,7 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
-        var sql = identity.Cpf is null ? InsertIdentityWithoutCpfSql : UpsertIdentitySql;
+        var sql = identity.Cpf is null ? UpsertIdentityWithoutCpfSql : UpsertIdentitySql;
 
         return await connection.QuerySingleAsync<Guid>(new CommandDefinition(
             sql,

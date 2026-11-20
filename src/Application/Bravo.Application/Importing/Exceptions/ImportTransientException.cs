@@ -1,12 +1,10 @@
 namespace Bravo.Application.Importing.Exceptions;
 
-public sealed class ImportTransientException : Exception
+public sealed class ImportTransientException(
+    string message,
+    TimeSpan? retryAfter = null,
+    Exception? innerException = null
+) : Exception(message, innerException)
 {
-    public TimeSpan? RetryAfter { get; }
-
-    public ImportTransientException(string message, TimeSpan? retryAfter = null, Exception? innerException = null)
-        : base(message, innerException)
-    {
-        RetryAfter = retryAfter;
-    }
+    public TimeSpan? RetryAfter { get; } = retryAfter;
 }

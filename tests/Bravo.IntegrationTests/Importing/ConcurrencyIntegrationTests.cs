@@ -1,8 +1,6 @@
-using Bravo.Application.Importing.Exceptions;
-using Bravo.Domain.Importing.Entities;
-using Bravo.Domain.Importing.Enums;
 using Bravo.IntegrationTests.Configurations;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Bravo.IntegrationTests.Importing;
 
@@ -10,160 +8,101 @@ namespace Bravo.IntegrationTests.Importing;
 public sealed class ConcurrencyIntegrationTests(PostgresContainerFixture pg) : ImportingTestBase(pg)
 {
     [Fact]
-    public async Task TwoWorkersCannotClaimTheSameWorkUnit()
+    public async Task TwoWorkersCannotClaimTheSameJob()
     {
-        var job = await CreateJobAsync();
-        await MarkJobRunningAsync(job.Id);
+        var jobId = await CreateJobAsync();
 
-        var firstWorker = await ClaimNextAsync(job.Id, "worker-a");
-        var secondWorker = await ClaimNextAsync(job.Id, "worker-b");
+        var first = await ClaimAsync(jobId, "worker-a");
+        var second = await ClaimAsync(jobId, "worker-b");
 
-        firstWorker.Should().NotBeNull();
-        secondWorker.Should().BeNull();
-        firstWorker!.LeaseOwner.Should().Be("worker-a");
+        first.Should().NotBeNull();
+        second.Should().BeNull();
+        first!.LeaseOwner.Should().Be("worker-a");
     }
 
     [Fact]
-    public async Task ExpiredLeaseCanBeReclaimedWithANewFencingToken()
+    public async Task ExpiredLeaseCanBeReclaimedByAnotherWorker()
     {
-        var job = await CreateJobAsync();
-        await MarkJobRunningAsync(job.Id);
+        var jobId = await CreateJobAsync();
 
-        var firstWorker = await ClaimNextAsync(job.Id, "worker-a", leaseSeconds: 1);
-        await Task.Delay(TimeSpan.FromMilliseconds(1_200));
+        var first = await ClaimAsync(jobId, "worker-a", leaseSeconds: 1);
+        first.Should().NotBeNull();
 
-        var secondWorker = await ClaimNextAsync(job.Id, "worker-b", leaseSeconds: 60);
+        await Task.Delay(TimeSpan.FromMilliseconds(1_300));
 
-        secondWorker.Should().NotBeNull();
-        secondWorker!.Id.Should().Be(firstWorker!.Id);
-        secondWorker.LeaseOwner.Should().Be("worker-b");
-        secondWorker.FencingToken.Should().Be(firstWorker.FencingToken + 1);
-    }
+        var second = await ClaimAsync(jobId, "worker-b");
 
-    [Fact]
-    public async Task StaleWorkerCannotCommitAfterLosingOwnership()
-    {
-        var job = await CreateJobAsync();
-        await MarkJobRunningAsync(job.Id);
-
-        var staleWorker = await ClaimNextAsync(job.Id, "worker-a", leaseSeconds: 1);
-        await Task.Delay(TimeSpan.FromMilliseconds(1_200));
-
-        var newOwner = await ClaimNextAsync(job.Id, "worker-b", leaseSeconds: 60);
-        newOwner.Should().NotBeNull();
-
-        var action = async () => await ApplyBatchAsync(
-            staleWorker!,
-            [CreateState(131)],
-            nextCursor: null,
-            isFinalBatch: true);
-
-        await action.Should().ThrowAsync<ImportLeaseLostException>();
-        (await CountStatesAsync()).Should().Be(0);
-
-        var workUnit = (await GetWorkUnitsAsync(job.Id)).Single();
-        workUnit.Status.Should().Be(ImportWorkUnitStatus.Running);
-        workUnit.LeaseOwner.Should().Be("worker-b");
-        workUnit.Cursor.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task CompletedWorkUnitsAreNotClaimedAgain()
-    {
-        var job = await CreateJobAsync(unitKeys: ["first", "second"]);
-        await MarkJobRunningAsync(job.Id);
-
-        var first = await ClaimNextAsync(job.Id, "worker-a");
-        first!.UnitKey.Should().Be("first");
-
-        await ApplyBatchAsync(first, [], nextCursor: null, isFinalBatch: true);
-
-        var second = await ClaimNextAsync(job.Id, "worker-a");
         second.Should().NotBeNull();
-        second!.UnitKey.Should().Be("second");
-
-        await ApplyBatchAsync(second, [], nextCursor: null, isFinalBatch: true);
-
-        var jobAfterCompletion = await GetJobAsync(job.Id);
-        jobAfterCompletion!.Status.Should().Be(ImportJobStatus.Completed);
-        (await ClaimNextAsync(job.Id, "worker-b")).Should().BeNull();
+        second!.LeaseOwner.Should().Be("worker-b");
+        second.AttemptCount.Should().Be(first!.AttemptCount + 1);
     }
 
     [Fact]
-    public async Task CancelledJobIsNotRecoveredOrExecuted()
+    public async Task RenewalKeepsTheLeaseAndReportsOwnership()
     {
-        Source.Add(CreateState(141));
-        var job = await CreateJobAsync();
+        var jobId = await CreateJobAsync();
+        await ClaimAsync(jobId, "worker-a", leaseSeconds: 1);
 
-        (await CancelJobAsync(job.Id)).Should().BeTrue();
+        await using var scope = Pg.Factory.Services.CreateAsyncScope();
+        var jobs = scope.ServiceProvider.GetRequiredService<Bravo.Domain.Importing.Repositories.IImportJobRepository>();
 
-        (await ListRecoverableIdsAsync()).Should().NotContain(job.Id);
+        (await jobs.RenewLeaseAsync(jobId, "worker-a", TimeSpan.FromSeconds(60)))
+            .Should().BeTrue();
 
-        await RunJobAsync(job.Id);
-
-        var cancelledJob = await GetJobAsync(job.Id);
-        var workUnit = (await GetWorkUnitsAsync(job.Id)).Single();
-
-        cancelledJob!.Status.Should().Be(ImportJobStatus.Cancelled);
-        workUnit.Status.Should().Be(ImportWorkUnitStatus.Cancelled);
-        (await CountStatesAsync()).Should().Be(0);
-    }
-
-    [Fact]
-    public async Task CancellationPreventsInFlightBatchFromCommitting()
-    {
-        var job = await CreateJobAsync();
-        await MarkJobRunningAsync(job.Id);
-
-        var workUnit = await ClaimNextAsync(job.Id, "worker-a");
-        workUnit.Should().NotBeNull();
-
-        (await CancelJobAsync(job.Id)).Should().BeTrue();
-
-        var action = async () => await ApplyBatchAsync(
-            workUnit!,
-            [CreateState(151)],
-            nextCursor: null,
-            isFinalBatch: true);
-
-        await action.Should().ThrowAsync<ImportLeaseLostException>();
-        (await CountStatesAsync()).Should().Be(0);
-
-        var cancelledJob = await GetJobAsync(job.Id);
-        cancelledJob!.Status.Should().Be(ImportJobStatus.Cancelled);
+        (await jobs.RenewLeaseAsync(jobId, "worker-b", TimeSpan.FromSeconds(60)))
+            .Should().BeFalse();
     }
 
     [Fact]
     public async Task OverlappingScopeCannotStartTwice()
     {
-        var first = CreateOverlapJob();
-        (await TryCreateJobAsync(first, "states")).Should().BeTrue();
+        var scope = UniqueScope("scope");
 
-        var duplicate = CreateOverlapJob();
-        (await TryCreateJobAsync(duplicate, "states")).Should().BeFalse();
+        var first = NewJob(scope: scope);
+        var duplicate = NewJob(scope: scope);
+        var other = NewJob(scope: UniqueScope("other"));
 
-        var otherScope = CreateOverlapJob();
-        (await TryCreateJobAsync(otherScope, "municipalities")).Should().BeTrue();
+        (await TryCreateJobAsync(first)).Should().BeTrue();
+        (await TryCreateJobAsync(duplicate)).Should().BeFalse();
+        (await TryCreateJobAsync(other)).Should().BeTrue();
     }
 
     [Fact]
-    public async Task LaterWorkUnitIsNotClaimedBeforeEarlierOneCompletes()
+    public async Task ConcurrentCreatesForTheSameScopeAllowOnlyOneWinner()
     {
-        var job = await CreateJobAsync(unitKeys: ["first", "second"]);
-        await MarkJobRunningAsync(job.Id);
+        var scope = UniqueScope("race");
+        var attempts = Enumerable.Range(0, 8).Select(_ => NewJob(scope: scope)).ToArray();
 
-        var first = await ClaimNextAsync(job.Id, "worker-a");
-        first!.UnitKey.Should().Be("first");
+        var results = await Task.WhenAll(attempts.Select(job => TryCreateJobAsync(job)));
 
-        (await ClaimNextAsync(job.Id, "worker-b")).Should().BeNull();
-
-        await ApplyBatchAsync(first, [], nextCursor: null, isFinalBatch: true);
-
-        var second = await ClaimNextAsync(job.Id, "worker-b");
-        second.Should().NotBeNull();
-        second!.UnitKey.Should().Be("second");
+        results.Count(created => created).Should().Be(1);
     }
 
-    private static ImportJob CreateOverlapJob()
-        => ImportJob.Create(10, 3, 60);
+    [Fact]
+    public async Task ParallelismIsBoundedByTheJobSetting()
+    {
+        Source.Operations = 8;
+        Source.OperationDelayMilliseconds = 80;
+
+        var jobId = await CreateJobAsync(maxParallelism: 3);
+
+        await RunJobAsync(jobId);
+
+        var run = Source.Runs.Single();
+
+        run.MaxObservedParallelism.Should().BeGreaterThan(1);
+        run.MaxObservedParallelism.Should().BeLessThanOrEqualTo(3);
+    }
+
+    [Fact]
+    public async Task ParallelismOfOneExecutesOperationsSequentially()
+    {
+        Source.Operations = 4;
+
+        var jobId = await CreateJobAsync(maxParallelism: 1);
+
+        await RunJobAsync(jobId);
+
+        Source.Runs.Single().MaxObservedParallelism.Should().Be(1);
+    }
 }

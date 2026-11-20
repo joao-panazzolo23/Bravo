@@ -27,4 +27,12 @@ public interface IGeographyRepository
     Task<int> UpsertStatesAsync(
         IReadOnlyCollection<State> states,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Upserts municipalities, resolving each one's state by IBGE code. Returns the number of
+    /// rows written; a count below the input means some states were not imported yet.
+    /// </summary>
+    Task<int> UpsertMunicipalitiesAsync(
+        IReadOnlyCollection<MunicipalityUpsert> municipalities,
+        CancellationToken cancellationToken = default);
 }

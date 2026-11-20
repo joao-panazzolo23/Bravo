@@ -1,7 +1,8 @@
 namespace Bravo.Application.Importing.ViewModels;
 
 /// <summary>
-/// Work-unit completion. <see cref="Percentage"/> is exact because the total is known.
+/// Operation (job-level unit of work) completion. <see cref="Percentage"/> is exact because the
+/// source declares how many operations it will execute.
 /// </summary>
 public sealed record ImportProgressWorkUnits(
     int Total,
@@ -10,4 +11,5 @@ public sealed record ImportProgressWorkUnits(
     int Pending,
     int Running,
     int Retried,
-    double Percentage);
+    double Percentage
+);

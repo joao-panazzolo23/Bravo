@@ -27,7 +27,7 @@ internal sealed class ImportFailedRecordMap : EntityMapper<ImportFailedRecord>
         builder.Property(x => x.AttemptCount)
             .IsRequired();
 
-        builder.HasIndex(x => new { x.WorkUnitId, x.SourceIdentifier })
+        builder.HasIndex(x => new { x.JobId, x.SourceIdentifier })
             .IsUnique();
 
         builder.HasIndex(x => new { x.JobId, x.CreatedAt });
@@ -35,11 +35,6 @@ internal sealed class ImportFailedRecordMap : EntityMapper<ImportFailedRecord>
         builder.HasOne<ImportJob>()
             .WithMany()
             .HasForeignKey(x => x.JobId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasOne<ImportWorkUnit>()
-            .WithMany()
-            .HasForeignKey(x => x.WorkUnitId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

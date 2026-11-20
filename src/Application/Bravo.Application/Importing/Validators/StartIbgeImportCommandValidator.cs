@@ -15,6 +15,10 @@ public sealed class StartIbgeImportCommandValidator : AbstractValidator<StartIbg
             .InclusiveBetween(1, 1_000)
             .When(command => command.MaxAttempts.HasValue);
 
+        RuleFor(command => command.MaxParallelism)
+            .InclusiveBetween(1, 64)
+            .When(command => command.MaxParallelism.HasValue);
+
         RuleFor(command => command.LeaseDurationSeconds)
             .InclusiveBetween(1, 86_400)
             .When(command => command.LeaseDurationSeconds.HasValue);

@@ -1,12 +1,9 @@
 namespace Bravo.Domain.Importing.Enums;
 
 /// <summary>
-/// Observable stages a work unit moves through while a pipeline executes it.
+/// Observable stages an import moves through. Persisted as text on the job row, so adding a
+/// stage does not require a data migration of numeric values.
 /// </summary>
-/// <remarks>
-/// Values are persisted as text via <c>ImportWorkUnits.CurrentStage</c>, so existing rows are
-/// readable and adding a stage does not require a data migration of numeric values.
-/// </remarks>
 public enum ImportStage
 {
     Pending,
@@ -19,6 +16,9 @@ public enum ImportStage
     Normalizing,
     Persisting,
     Finalizing,
+    References,
+    Candidates,
+    Results,
     Completed,
     Failed
 }

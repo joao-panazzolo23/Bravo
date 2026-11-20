@@ -16,4 +16,10 @@ public sealed class ImportWorkerOptions
 
     [Range(1, 1_000)]
     public int MaxJobsPerPoll { get; set; } = 20;
+
+    /// <summary>
+    /// When true, jobs left Running by a previous process on this machine are released at
+    /// startup instead of waiting for their lease to expire.
+    /// </summary>
+    public bool RecoverOnStartup { get; set; } = true;
 }

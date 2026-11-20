@@ -1,19 +1,17 @@
 using Bravo.Application.Importing.Commands;
-using Bravo.Domain.Importing.Services;
+using Bravo.Domain.Importing.Repositories;
 using Bravo.Shared.Result;
 using Mediator;
-using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Application.Importing.Handlers;
 
-public sealed class CancelImportJobHandler(
-    IImportJobRepository jobs
-)
+public sealed class CancelImportJobHandler(IImportJobRepository jobs)
     : ICommandHandler<CancelImportJobCommand, Result<Unit>>
 {
     public async ValueTask<Result<Unit>> Handle(
         CancelImportJobCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var job = await jobs.GetAsync(command.JobId, cancellationToken);
 

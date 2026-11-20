@@ -1,4 +1,3 @@
-using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Electoral.Enums;
 using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Geography.Repositories;

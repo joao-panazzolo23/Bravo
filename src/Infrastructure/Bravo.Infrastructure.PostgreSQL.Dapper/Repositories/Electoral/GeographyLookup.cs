@@ -33,6 +33,22 @@ internal sealed class GeographyLookup(NpgsqlDataSource dataSource) : IGeographyR
             "UpdatedAt" = EXCLUDED."UpdatedAt";
         """;
 
+    private const string UpsertMunicipalitiesSql = """
+        INSERT INTO "Municipalities"
+            ("Id", "IbgeCode", "Name", "StateId", "CreatedAt", "UpdatedAt")
+        SELECT record."Id", record."IbgeCode", record."Name",
+               state."Id", record."CreatedAt", record."UpdatedAt"
+        FROM jsonb_to_recordset(@Records::jsonb) AS record(
+            "Id" uuid, "IbgeCode" integer, "Name" varchar(150),
+            "StateIbgeCode" integer,
+            "CreatedAt" timestamp with time zone, "UpdatedAt" timestamp with time zone)
+        JOIN "States" AS state ON state."IbgeCode" = record."StateIbgeCode"
+        ON CONFLICT ("IbgeCode") DO UPDATE SET
+            "Name" = EXCLUDED."Name",
+            "StateId" = EXCLUDED."StateId",
+            "UpdatedAt" = EXCLUDED."UpdatedAt";
+        """;
+
     public async Task<IReadOnlyDictionary<string, Guid>> GetStateIdsByAcronymAsync(
         CancellationToken cancellationToken = default)
     {
@@ -70,6 +86,33 @@ internal sealed class GeographyLookup(NpgsqlDataSource dataSource) : IGeographyR
     }
 
     private sealed record StateRow(string Abbreviation, Guid Id);
+
+    public async Task<int> UpsertMunicipalitiesAsync(
+        IReadOnlyCollection<MunicipalityUpsert> municipalities,
+        CancellationToken cancellationToken = default)
+    {
+        if (municipalities.Count == 0)
+            return 0;
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+
+        var payload = System.Text.Json.JsonSerializer.Serialize(municipalities.Select(municipality => new
+        {
+            Id = Guid.CreateVersion7(),
+            municipality.IbgeCode,
+            municipality.Name,
+            municipality.StateIbgeCode,
+            CreatedAt = now,
+            UpdatedAt = now
+        }));
+
+        return await connection.ExecuteAsync(new CommandDefinition(
+            UpsertMunicipalitiesSql,
+            new { Records = payload },
+            cancellationToken: cancellationToken));
+    }
 
     public async Task<int> UpsertStatesAsync(
         IReadOnlyCollection<Bravo.Domain.Geography.Entities.State> states,

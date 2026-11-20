@@ -26,6 +26,8 @@ public class RefreshTokenHandler(
 
         return Result<LoginViewModel>.OK(new LoginViewModel(
             _tokenService.GenerateToken(user),
-            _tokenService.GenerateRefreshToken(user)));
+            _tokenService.GenerateRefreshToken(user)
+            )
+        );
     }
 }

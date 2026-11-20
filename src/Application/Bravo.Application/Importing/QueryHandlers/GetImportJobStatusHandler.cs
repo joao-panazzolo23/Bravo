@@ -1,15 +1,12 @@
-using Bravo.Domain.Importing.Services;
 using Bravo.Application.Importing.Queries;
 using Bravo.Application.Importing.ViewModels;
+using Bravo.Domain.Importing.Repositories;
 using Bravo.Shared.Result;
 using Mediator;
-using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Application.Importing.QueryHandlers;
 
-public sealed class GetImportJobStatusHandler(
-    IImportJobRepository jobs,
-    IImportWorkUnitRepository workUnits)
+public sealed class GetImportJobStatusHandler(IImportJobRepository jobs)
     : IQueryHandler<GetImportJobStatusQuery, Result<ImportJobStatusViewModel?>>
 {
     public async ValueTask<Result<ImportJobStatusViewModel?>> Handle(
@@ -21,34 +18,28 @@ public sealed class GetImportJobStatusHandler(
         if (job is null)
             return Result<ImportJobStatusViewModel?>.NotFound(message: "Import job not found.");
 
-        var units = await workUnits.GetByJobAsync(query.JobId, cancellationToken);
-
         var viewModel = new ImportJobStatusViewModel(
             job.Id,
+            job.Source,
+            job.Scope,
             job.Status.ToString(),
+            job.Stage.ToString(),
             job.BatchSize,
             job.MaxAttempts,
+            job.MaxParallelism,
             job.LeaseDurationSeconds,
+            job.AttemptCount,
+            job.TotalOperations,
+            job.CompletedOperations,
+            job.FailedOperations,
             job.TotalProcessedRecords,
             job.TotalFailedRecords,
+            job.CurrentOperation,
             job.LastError,
             job.CreatedAt,
             job.StartedAt,
-            job.CompletedAt,
-            units.Select(unit => new ImportWorkUnitStatusViewModel(
-                unit.Id,
-                unit.UnitKey,
-                unit.Status.ToString(),
-                unit.Cursor,
-                unit.ProcessedRecords,
-                unit.FailedRecords,
-                unit.AttemptCount,
-                unit.LastError,
-                unit.LeaseOwner,
-                unit.LeaseExpiresAt,
-                unit.FencingToken,
-                unit.StartedAt,
-                unit.CompletedAt)).ToArray());
+            job.CompletedAt
+        );
 
         return Result<ImportJobStatusViewModel?>.OK(viewModel);
     }

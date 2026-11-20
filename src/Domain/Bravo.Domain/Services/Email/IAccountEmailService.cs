@@ -5,6 +5,13 @@ namespace Bravo.Domain.Services.Email;
 
 public interface IAccountEmailService
 {
-    Task SendPasswordRecovery(User user, RecoveryToken token, CancellationToken cancellationToken = default);
-    Task SendPasswordChanged(User user, CancellationToken cancellationToken = default);
+    Task SendPasswordRecovery(
+        User user,
+        RecoveryToken token,
+        CancellationToken cancellationToken = default
+    );
+    Task SendPasswordChanged(
+        User user,
+        CancellationToken cancellationToken = default
+    );
 }

@@ -1,7 +1,9 @@
-using Bravo.Domain.Importing.Models;
+using Bravo.Application.Importing.Exceptions;
 using Bravo.Domain.Importing.Enums;
+using Bravo.Domain.Importing.Models;
 using Bravo.IntegrationTests.Configurations;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Bravo.IntegrationTests.Importing;
 
@@ -9,61 +11,109 @@ namespace Bravo.IntegrationTests.Importing;
 public sealed class IdempotencyIntegrationTests(PostgresContainerFixture pg) : ImportingTestBase(pg)
 {
     [Fact]
-    public async Task ReprocessingIdenticalBatchDoesNotCreateDuplicates()
+    public async Task RerunningTheSameJobDoesNotDuplicateFailedRecords()
     {
-        Source.Add(CreateState(51), CreateState(52), CreateState(53));
-        var firstJob = await CreateJobAsync(batchSize: 2);
-        await RunJobAsync(firstJob.Id);
+        var jobId = await CreateJobAsync();
 
-        Source.Reset();
-        Source.Add(CreateState(51), CreateState(52), CreateState(53));
-        var secondJob = await CreateJobAsync(batchSize: 2);
-        await RunJobAsync(secondJob.Id);
+        await using var scope = Pg.Factory.Services.CreateAsyncScope();
+        var failedRecords = scope.ServiceProvider
+            .GetRequiredService<Bravo.Domain.Importing.Repositories.IImportFailedRecordRepository>();
 
-        (await CountStatesAsync()).Should().Be(3);
-        (await GetJobAsync(secondJob.Id))!.Status.Should().Be(ImportJobStatus.Completed);
+        var rejected = new[]
+        {
+            new ImportRejectedRecord(
+                "source:row:1",
+                "malformed payload",
+                ImportErrorCategory.Deserialization,
+                "The source row could not be parsed."),
+            new ImportRejectedRecord(
+                "source:row:2",
+                null,
+                ImportErrorCategory.Validation,
+                "The source row was rejected.")
+        };
+
+        await failedRecords.UpsertAsync(jobId, rejected);
+        await failedRecords.UpsertAsync(jobId, rejected);
+
+        var stored = await GetFailedRecordsAsync(jobId);
+
+        stored.Should().HaveCount(2);
+        stored.Should().OnlyContain(record => record.AttemptCount == 2);
     }
 
     [Fact]
-    public async Task ReimportingUpdatesExistingRecords()
+    public async Task RerunningAnImportUpdatesTheSameFailedRecord()
     {
-        Source.Add(CreateState(61, name: "Original"));
-        var firstJob = await CreateJobAsync(batchSize: 1);
-        await RunJobAsync(firstJob.Id);
+        var jobId = await CreateJobAsync();
 
-        Source.Reset();
-        Source.Add(CreateState(61, name: "Replacement"));
-        var secondJob = await CreateJobAsync(batchSize: 1);
-        await RunJobAsync(secondJob.Id);
+        await using var scope = Pg.Factory.Services.CreateAsyncScope();
+        var failedRecords = scope.ServiceProvider
+            .GetRequiredService<Bravo.Domain.Importing.Repositories.IImportFailedRecordRepository>();
 
-        (await GetStateNameAsync(61)).Should().Be("Replacement");
-        (await CountStatesAsync()).Should().Be(1);
+        await failedRecords.UpsertAsync(jobId, [
+            new ImportRejectedRecord(
+                "source:row:1", null, ImportErrorCategory.Source, "First error.")
+        ]);
+
+        await failedRecords.UpsertAsync(jobId, [
+            new ImportRejectedRecord(
+                "source:row:1", null, ImportErrorCategory.Source, "Corrected error.")
+        ]);
+
+        var stored = await GetFailedRecordsAsync(jobId);
+
+        stored.Should().ContainSingle();
+        stored.Single().ErrorDescription.Should().Be("Corrected error.");
+        stored.Single().AttemptCount.Should().Be(2);
     }
 
     [Fact]
-    public async Task InvalidRecordsAreStoredAsFailedRecordsAndDoNotStopTheJob()
+    public async Task FullRestartProducesTheSameFinalState()
     {
-        Source.Add(CreateState(91), CreateState(92), CreateState(93));
-        Source.Reject(new ImportRejectedRecord(
-            "source:row:1",
-            "malformed payload",
-            ImportErrorCategory.Deserialization,
-            "The source row could not be parsed."));
-        Validator.Reject(92);
+        Source.Operations = 5;
+        Source.RecordsPerOperation = 4;
 
-        var job = await CreateJobAsync(batchSize: 3);
+        var scope = UniqueScope("restart");
 
-        await RunJobAsync(job.Id);
+        var firstJob = await CreateJobAsync(scope: scope);
+        var first = await RunJobAsync(firstJob);
 
-        var completedJob = await GetJobAsync(job.Id);
-        var failedRecords = await GetFailedRecordsAsync(job.Id);
+        first!.Status.Should().Be(ImportJobStatus.Completed);
+        first.TotalProcessedRecords.Should().Be(20);
 
-        completedJob!.Status.Should().Be(ImportJobStatus.CompletedWithErrors);
-        completedJob.TotalProcessedRecords.Should().Be(2);
-        completedJob.TotalFailedRecords.Should().Be(2);
-        failedRecords.Should().HaveCount(2);
-        failedRecords.Should().ContainSingle(record => record.SourceIdentifier == "source:row:1");
-        failedRecords.Should().ContainSingle(record => record.ErrorCategory == ImportErrorCategory.Validation);
-        (await CountStatesAsync()).Should().Be(2);
+        // A restart re-executes the whole import from the beginning. Because the job is
+        // completed it no longer blocks the scope, so a second full run is allowed and must
+        // converge on the same counters instead of accumulating.
+        var secondJob = await CreateJobAsync(scope: scope);
+        var second = await RunJobAsync(secondJob);
+
+        second!.Status.Should().Be(ImportJobStatus.Completed);
+        second.TotalProcessedRecords.Should().Be(20);
+        second.CompletedOperations.Should().Be(5);
+        Source.ExecutionCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task RejectedRecordsFromDifferentJobsStayIsolated()
+    {
+        var firstJob = await CreateJobAsync(scope: UniqueScope("first"));
+        var secondJob = await CreateJobAsync(scope: UniqueScope("second"));
+
+        await using var scope = Pg.Factory.Services.CreateAsyncScope();
+        var failedRecords = scope.ServiceProvider
+            .GetRequiredService<Bravo.Domain.Importing.Repositories.IImportFailedRecordRepository>();
+
+        var rejected = new[]
+        {
+            new ImportRejectedRecord(
+                "source:row:1", null, ImportErrorCategory.Validation, "Rejected.")
+        };
+
+        await failedRecords.UpsertAsync(firstJob, rejected);
+        await failedRecords.UpsertAsync(secondJob, rejected);
+
+        (await GetFailedRecordsAsync(firstJob)).Should().ContainSingle();
+        (await GetFailedRecordsAsync(secondJob)).Should().ContainSingle();
     }
 }

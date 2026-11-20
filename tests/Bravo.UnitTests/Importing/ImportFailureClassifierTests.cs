@@ -21,10 +21,10 @@ public sealed class ImportFailureClassifierTests
     }
 
     [Fact]
-    public void LeaseLossIsNotRetryable()
+    public void HttpFailureIsRetryable()
     {
-        ImportFailureClassifier.IsTransient(new ImportLeaseLostException("Lease lost."))
-            .Should().BeFalse();
+        ImportFailureClassifier.IsTransient(new HttpRequestException("Temporary outage."))
+            .Should().BeTrue();
     }
 
     [Fact]

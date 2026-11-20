@@ -4,5 +4,6 @@ using Mediator;
 
 namespace Bravo.Application.Importing.Queries;
 
-public sealed record GetImportJobStatusQuery(Guid JobId)
-    : IQuery<Result<ImportJobStatusViewModel?>>;
+public sealed record GetImportJobStatusQuery(
+    Guid JobId
+) : IQuery<Result<ImportJobStatusViewModel?>>;
