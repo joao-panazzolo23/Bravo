@@ -9,16 +9,18 @@ namespace Bravo.Application.Importing.Handlers;
 public sealed class StartIbgeImportHandler(ImportJobStarter starter)
     : ICommandHandler<StartIbgeImportCommand, Result<ImportJobCreatedViewModel>>
 {
-    public ValueTask<Result<ImportJobCreatedViewModel>> Handle(
+    public async ValueTask<Result<ImportJobCreatedViewModel>> Handle(
         StartIbgeImportCommand command,
         CancellationToken cancellationToken)
-        => new(starter.StartAsync(
-            "IBGE",
-            "IBGE:localities",
-            command.BatchSize,
-            command.MaxAttempts,
-            command.MaxParallelism,
-            command.LeaseDurationSeconds,
-            cancellationToken)
-        );
+    {
+        return await starter.StartAsync(
+                "IBGE",
+                "IBGE:localities",
+                command.BatchSize,
+                command.MaxAttempts,
+                command.MaxParallelism,
+                command.LeaseDurationSeconds,
+                cancellationToken);
+    }
+
 }

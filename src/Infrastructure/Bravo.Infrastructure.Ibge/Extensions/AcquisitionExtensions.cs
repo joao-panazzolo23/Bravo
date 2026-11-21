@@ -1,8 +1,7 @@
-using Bravo.Domain.Importing.Services;
-using Bravo.Infrastructure.Acquisition;
-using Bravo.Infrastructure.Acquisition.Importing;
-using Bravo.Infrastructure.Acquisition.Options;
-using Bravo.Infrastructure.Acquisition.RateLimiting;
+using Bravo.Application.Importing.Sources.Ibge;
+using Bravo.Infrastructure.Ibge.Importing;
+using Bravo.Infrastructure.Ibge.Options;
+using Bravo.Infrastructure.Ibge.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -30,6 +29,8 @@ public static class AcquisitionExtensions
             client.Timeout = TimeSpan.FromSeconds(settings.HttpTimeoutSeconds);
         });
 
-        return services.AddScoped<IImportSource, IbgeImportSource>();
+        // Transport only. The IBGE import orchestration lives in the application layer
+        // (IbgeImportSource) and is registered by AddApplication.
+        return services.AddScoped<IIbgeReader, IbgeReader>();
     }
 }

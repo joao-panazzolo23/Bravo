@@ -25,7 +25,6 @@ public sealed class TseSyntheticScopeSeeder(
 
     public async Task<Guid> EnsureAsync(
         string scope,
-        Func<IReadOnlyCollection<State>, CancellationToken, Task<int>> upsert,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scope);
@@ -45,7 +44,9 @@ public sealed class TseSyntheticScopeSeeder(
 
         var name = TseScopes.Synthetic.First(entry => entry.Abbreviation == scope).Name;
 
-        await upsert([State.Create(code, scope, name, "NACIONAL")], cancellationToken);
+        await geography.UpsertStatesAsync(
+            [State.Create(code, scope, name, "NACIONAL")],
+            cancellationToken);
 
         var refreshed = await geography.GetStateIdsByAcronymAsync(cancellationToken);
 

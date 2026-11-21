@@ -1,5 +1,7 @@
 using Bravo.Domain.Electoral.Services;
 using Bravo.Application.Electoral.Services;
+using Bravo.Application.Importing.Options;
+using Bravo.Application.Importing.Services;
 using Bravo.Application.Importing.Sources.Tse;
 using Bravo.Domain.Importing.Services;
 using Bravo.Infrastructure.Tse.Acquisition;
@@ -24,6 +26,15 @@ public static class TseExtensions
         services.AddOptions<TseOptions>()
             .Bind(configuration.GetSection(TseOptions.SectionName))
             .ValidateOnStart();
+
+        services.AddOptions<ImportResourceOptions>()
+            .Bind(configuration.GetSection(ImportResourceOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        // One governor per process: the limits it enforces are only meaningful if every scope
+        // in every job shares the same instance.
+        services.AddSingleton<ImportResourceGovernor>();
 
         services.AddSingleton(provider => new TseRateLimiter(
             provider.GetRequiredService<IOptions<TseOptions>>()));

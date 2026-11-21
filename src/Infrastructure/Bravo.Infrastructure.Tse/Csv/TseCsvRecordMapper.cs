@@ -2,11 +2,6 @@ using Bravo.Infrastructure.Tse.Layouts;
 
 namespace Bravo.Infrastructure.Tse.Csv;
 
-public sealed record TseRecord(
-    IReadOnlyDictionary<string, string> Values);
-
-public sealed class TseLayoutMismatchException(string message) : Exception(message);
-
 /// <summary>
 /// Maps raw delimited rows onto canonical field names declared by a <see cref="TseLayout"/>.
 /// </summary>
@@ -19,15 +14,18 @@ internal sealed class TseCsvRecordMapper
 {
     private readonly TseLayout _layout;
     private readonly string[] _canonicalByIndex;
+    private readonly IReadOnlyDictionary<string, int> _indexByCanonical;
     private readonly IReadOnlyList<string> _missingColumns;
 
     private TseCsvRecordMapper(
         TseLayout layout,
         string[] canonicalByIndex,
+        IReadOnlyDictionary<string, int> indexByCanonical,
         IReadOnlyList<string> missingColumns)
     {
         _layout = layout;
         _canonicalByIndex = canonicalByIndex;
+        _indexByCanonical = indexByCanonical;
         _missingColumns = missingColumns;
     }
 
@@ -70,26 +68,27 @@ internal sealed class TseCsvRecordMapper
             .Where(sourceColumn => layout.RequiredCanonicalFields.Contains(layout.Columns[sourceColumn]))
             .ToArray();
 
-        return new TseCsvRecordMapper(layout, canonicalByIndex, missingRequired);
+        // Built once per file: the hot path resolves a canonical name through this map instead
+        // of constructing a dictionary for every row.
+        var indexByCanonical = new Dictionary<string, int>(present.Count, StringComparer.Ordinal);
+
+        for (var index = 0; index < canonicalByIndex.Length; index++)
+        {
+            var canonical = canonicalByIndex[index];
+
+            if (canonical.Length > 0 && !indexByCanonical.ContainsKey(canonical))
+                indexByCanonical[canonical] = index;
+        }
+
+        return new TseCsvRecordMapper(
+            layout, canonicalByIndex, indexByCanonical, missingRequired);
     }
 
     public TseRecord Map(IReadOnlyList<string> row)
     {
         ArgumentNullException.ThrowIfNull(row);
 
-        var values = new Dictionary<string, string>(_canonicalByIndex.Length, StringComparer.Ordinal);
-
-        for (var index = 0; index < _canonicalByIndex.Length && index < row.Count; index++)
-        {
-            var canonical = _canonicalByIndex[index];
-
-            if (canonical.Length == 0)
-                continue;
-
-            values[canonical] = row[index];
-        }
-
-        return new TseRecord(values);
+        return new TseRecord(row, _indexByCanonical);
     }
 
     public void ThrowIfLayoutIncomplete()

@@ -46,6 +46,10 @@ public sealed partial class TseImportSource
             {
                 using var yearScope = logger.BeginOperationScope(year: year);
 
+                // Candidate scopes have their own budget: the files are much smaller than a
+                // results file, but they still deserve an independent bound.
+                using var permit = await resources.AcquireCandidateScopeAsync(token);
+
                 try
                 {
                     var count = await ImportCandidateYearAsync(
@@ -110,7 +114,15 @@ public sealed partial class TseImportSource
             }
 
             await using var stream = File.OpenRead(file.Dataset.FilePath);
-            var rows = candidateReader.Read(stream, file.Dataset.LayoutVersion);
+
+            // A candidate file is small enough to map in one go, but it still counts against
+            // the shared reader budget so it cannot starve a results stream.
+            IReadOnlyList<TseCandidateRow> rows;
+
+            using (await resources.AcquireCsvReaderAsync(cancellationToken))
+            {
+                rows = candidateReader.Read(stream, file.Dataset.LayoutVersion);
+            }
 
             imported += await ImportCandidateFileAsync(
                 year,
@@ -358,9 +370,6 @@ public sealed partial class TseImportSource
         if (!TseScopes.IsSynthetic(scope))
             return null;
 
-        return await syntheticScopes.EnsureAsync(
-            scope,
-            geography.UpsertStatesAsync,
-            cancellationToken);
+        return await syntheticScopes.EnsureAsync(scope, cancellationToken);
     }
 }

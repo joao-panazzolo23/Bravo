@@ -1,4 +1,5 @@
 using Bravo.Application.Electoral.Services;
+using Bravo.Application.Importing.Services;
 using Bravo.Domain.Electoral.Repositories;
 using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Importing.Models;
@@ -14,9 +15,10 @@ namespace Bravo.Application.Importing.Sources.Tse;
 /// <remarks>
 /// The three stages run in dependency order: reference data must exist before candidates, and
 /// candidates must exist before results can attribute nominal votes. Within a stage, independent
-/// units run concurrently with a bounded degree of parallelism. Each stage partial supplies one
-/// public entry point and keeps everything else private, so the source stays cohesive without a
-/// class per stage.
+/// units run concurrently, but every memory-heavy unit acquires a permit from the shared
+/// <see cref="ImportResourceGovernor"/> first, so the process-wide peak stays bounded no matter
+/// how many jobs are running. Each stage partial supplies one public entry point and keeps
+/// everything else private.
 /// </remarks>
 public sealed partial class TseImportSource(
     ITseDatasetAcquirer acquirer,
@@ -34,6 +36,7 @@ public sealed partial class TseImportSource(
     TseMunicipalityResolver municipalityResolver,
     TseSyntheticScopeSeeder syntheticScopes,
     DatasetVersionService datasetVersions,
+    ImportResourceGovernor resources,
     ILogger<TseImportSource> logger) : IImportSource
 {
     public const string SourceKey = "TSE";

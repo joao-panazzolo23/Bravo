@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Bravo.Infrastructure.Acquisition.Models;
+namespace Bravo.Infrastructure.Ibge.Models;
 
 public record IbgeMesoRegionDto(
     [property: JsonPropertyName("id")] int Id,

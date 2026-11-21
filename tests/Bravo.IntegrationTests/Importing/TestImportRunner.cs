@@ -1,99 +1,29 @@
-using Bravo.Application.Importing.Options;
 using Bravo.Application.Importing.Services;
-using Bravo.Domain.Importing.Enums;
-using Bravo.Domain.Importing.Models;
-using Bravo.Domain.Importing.Repositories;
-using Brave = Bravo.Domain.Importing.Services;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
+using Bravo.Domain.Importing.Entities;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Bravo.IntegrationTests.Importing;
 
 /// <summary>
-/// Executes one claim→run→complete cycle using the real worker algorithm but without the
-/// BackgroundService timer, so tests stay deterministic.
+/// Executes one claim→run→settle cycle through the production <see cref="ImportJobExecutor"/>,
+/// without the BackgroundService polling loop, so tests stay deterministic.
 /// </summary>
-public sealed class TestImportRunner(
-    IImportJobRepository jobs,
-    IEnumerable<Brave.IImportSource> sources,
-    IOptions<ImportEngineOptions> options,
-    ILogger<TestImportRunner> logger)
+/// <remarks>
+/// The executor is resolved from the request scope, exactly as the mediator handler resolves it
+/// in production. That means these tests cover the real lifecycle rather than a copy of it.
+/// </remarks>
+public sealed class TestImportRunner(IServiceProvider services)
 {
-    public async Task<Bravo.Domain.Importing.Entities.ImportJob?> RunAsync(
-        Guid jobId,
-        string workerId = "worker-test")
+    public const string TestWorkerId = "worker-test";
+
+    public async Task<ImportJob?> RunAsync(Guid jobId, string workerId = TestWorkerId)
     {
-        var settings = options.Value;
-        var lease = TimeSpan.FromSeconds(settings.DefaultLeaseDurationSeconds);
+        var executor = services.GetRequiredService<ImportJobExecutor>();
 
-        var job = await jobs.ClaimAsync(jobId, workerId, lease);
+        await executor.ExecuteAsync(jobId, workerId, CancellationToken.None);
 
-        if (job is null)
-            return await jobs.GetAsync(jobId);
+        var jobs = services.GetRequiredService<Bravo.Domain.Importing.Repositories.IImportJobRepository>();
 
-        var source = sources.FirstOrDefault(candidate => candidate.Key == job.Source);
-
-        if (source is null)
-        {
-            await jobs.CompleteAsync(
-                job.Id, workerId, ImportJobStatus.Failed,
-                $"No import source is registered for '{job.Source}'.");
-
-            return await jobs.GetAsync(job.Id);
-        }
-
-        var progress = new ImportProgressSink(
-            jobs,
-            job.Id,
-            workerId,
-            Options.Create(settings),
-            NullLogger.Instance);
-
-        var context = new ImportExecutionContext(
-            job.Id,
-            job.BatchSize,
-            job.MaxParallelism,
-            progress);
-
-        try
-        {
-            await source.ExecuteAsync(context, CancellationToken.None);
-            await progress.FlushAsync(CancellationToken.None);
-
-            var finished = await jobs.GetAsync(job.Id);
-
-            await jobs.CompleteAsync(
-                job.Id,
-                workerId,
-                finished is { TotalFailedRecords: > 0 }
-                    ? ImportJobStatus.CompletedWithErrors
-                    : ImportJobStatus.Completed,
-                error: null);
-        }
-        catch (OperationCanceledException)
-        {
-            await jobs.ReleaseAsync(job.Id, workerId, "cancelled");
-        }
-        catch (Exception exception)
-        {
-            var retryPolicy = new ImportRetryPolicy(Options.Create(settings));
-            var transient = ImportFailureClassifier.IsTransient(exception);
-
-            DateTime? retryAt = null;
-
-            if (transient && job.AttemptCount < job.MaxAttempts)
-            {
-                retryAt = DateTime.UtcNow.Add(retryPolicy.GetDelay(
-                    job.AttemptCount,
-                    ImportFailureClassifier.GetRetryAfter(exception)));
-            }
-
-            logger.LogDebug(exception, "Test import run failed for {JobId}.", job.Id);
-
-            await jobs.FailAsync(job.Id, workerId, exception.Message, retryAt);
-        }
-
-        return await jobs.GetAsync(job.Id);
+        return await jobs.GetAsync(jobId);
     }
 }

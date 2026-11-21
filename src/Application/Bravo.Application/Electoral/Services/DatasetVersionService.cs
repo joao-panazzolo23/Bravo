@@ -1,18 +1,10 @@
 using Bravo.Domain.Electoral.Services;
-using Bravo.Domain.Importing.Services;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Importing.Repositories;
 
 namespace Bravo.Application.Electoral.Services;
 
-/// <summary>
-/// Registers the acquired file and creates (or reuses) a dataset version for a scope.
-/// </summary>
-/// <remarks>
-/// The version is what results reference, so activating a replacement version supersedes the
-/// previous one rather than duplicating votes.
-/// </remarks>
 public sealed class DatasetVersionService(
     IImportDatasetRepository datasets,
     IDatasetVersionRepository versions)
@@ -48,7 +40,11 @@ public sealed class DatasetVersionService(
             cancellationToken
         );
 
-        await versions.SetStatusAsync(version.Id, DatasetVersionStatus.Importing, cancellationToken);
+        await versions.SetStatusAsync(
+            version.Id,
+            DatasetVersionStatus.Importing,
+            cancellationToken
+        );
 
         return version;
     }

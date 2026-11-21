@@ -1,5 +1,7 @@
 using Bravo.Application.Behaviors;
 using Bravo.Application.Importing.Services;
+using Bravo.Application.Importing.Sources.Ibge;
+using Bravo.Domain.Importing.Services;
 using Bravo.Shared.Notifications;
 using FluentValidation;
 using Mediator;
@@ -37,6 +39,10 @@ public static class ApplicationExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         return services.AddScoped<ImportJobStarter>()
-                       .AddScoped<ImportRetryPolicy>();
+                       .AddScoped<ImportRetryPolicy>()
+                       .AddScoped<ImportJobExecutor>()
+                       .AddScoped<ImportJobRecoveryService>()
+                       .AddScoped<IImportJobScheduler, ImportJobScheduler>()
+                       .AddScoped<IImportSource, IbgeImportSource>();
     }
 }

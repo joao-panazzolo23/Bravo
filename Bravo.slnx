@@ -24,4 +24,7 @@
     <Project Path="tests/Bravo.IntegrationTests/Bravo.IntegrationTests.csproj" />
     <Project Path="tests/Bravo.UnitTests/Bravo.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Bravo.PersistenceBenchmarks/Bravo.PersistenceBenchmarks.csproj" />
+  </Folder>
 </Solution>

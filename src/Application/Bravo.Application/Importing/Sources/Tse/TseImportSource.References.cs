@@ -3,15 +3,11 @@ using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Electoral.Models;
 using Bravo.Domain.Importing.Models;
-using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Importing.Sources.Tse;
 
 public sealed partial class TseImportSource
 {
-    /// <summary>
-    /// ta feio essa bomba
-    /// </remarks>
     private async Task ImportReferencesAsync(
         ImportExecutionContext context,
         CancellationToken cancellationToken)

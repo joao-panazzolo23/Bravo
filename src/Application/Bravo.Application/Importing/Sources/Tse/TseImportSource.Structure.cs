@@ -4,61 +4,52 @@ using Bravo.Domain.Electoral.Models;
 namespace Bravo.Application.Importing.Sources.Tse;
 
 /// <summary>
-/// Ensures the electoral structure a results file refers to (municipalities, zones, sections,
-/// polling places and their round assignments) exists before votes are written.
+/// Ensures the electoral structure a results file refers to exists before votes are written.
 /// </summary>
 /// <remarks>
 /// Structure is round-independent, so it is ensured once per (year, state) file. Every upsert is
 /// keyed by a natural key, which is what makes re-running an import safe. All reads are scoped
-/// to the state being imported, and the final maps are returned so the result resolver can
-/// reuse them instead of reading the tables again.
+/// to the state being imported, and the final maps are returned so the result resolver reuses
+/// them instead of reading the tables again.
+///
+/// The input is <see cref="TseStructureKeys"/> gathered from a first sequential pass over the
+/// file, so this stage is proportional to the distinct geography of one state rather than to the
+/// number of result rows.
 /// </remarks>
 public sealed partial class TseImportSource
 {
     private async Task<TseStructureIds> EnsureStructureAsync(
-        IReadOnlyList<TseSectionResultRow> rows,
+        TseStructureKeys keys,
         Guid stateId,
         IReadOnlyDictionary<string, Guid?> municipalityIds,
         TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
-        var resolved = rows
-            .Where(row => municipalityIds.TryGetValue(row.TseMunicipalityCode, out var id) && id is not null)
-            .Select(row => (Row: row, MunicipalityId: municipalityIds[row.TseMunicipalityCode]!.Value))
-            .Distinct()
-            .ToArray();
-
-        if (resolved.Length == 0)
-            return new TseStructureIds(
-                new Dictionary<(Guid, int), Guid>(),
-                new Dictionary<(Guid, Guid, int), Guid>(),
-                new Dictionary<(Guid, Guid?, int), Guid>());
-
-        var zoneIds = await EnsureZonesAsync(resolved, stateId, cancellationToken);
-        var sectionIds = await EnsureSectionsAsync(resolved, stateId, zoneIds, cancellationToken);
-        var placeIds = await EnsurePollingPlacesAsync(resolved, stateId, zoneIds, cancellationToken);
+        var zoneIds = await EnsureZonesAsync(keys, stateId, municipalityIds, cancellationToken);
+        var sectionIds = await EnsureSectionsAsync(keys, stateId, municipalityIds, zoneIds, cancellationToken);
+        var placeIds = await EnsurePollingPlacesAsync(keys, stateId, municipalityIds, zoneIds, cancellationToken);
 
         await EnsureAssignmentsAsync(
-            rows, stateId, municipalityIds, zoneIds, sectionIds, placeIds, electionLookup,
+            keys, stateId, municipalityIds, zoneIds, sectionIds, placeIds, electionLookup,
             cancellationToken);
 
         return new TseStructureIds(zoneIds, sectionIds, placeIds);
     }
 
     private async Task<IReadOnlyDictionary<(Guid, int), Guid>> EnsureZonesAsync(
-        (TseSectionResultRow Row, Guid MunicipalityId)[] resolved,
+        TseStructureKeys keys,
         Guid stateId,
+        IReadOnlyDictionary<string, Guid?> municipalityIds,
         CancellationToken cancellationToken)
     {
         var zoneIds = await structure.GetZoneIdsAsync(stateId, cancellationToken);
 
-        var newZones = resolved
-            .GroupBy(item => item.Row.ZoneNumber)
-            .Where(group => !zoneIds.ContainsKey((stateId, group.Key)))
-            .Select(group => ElectoralZone.Create(
+        var newZones = keys.ZoneNumbers()
+            .Where(number => !zoneIds.ContainsKey((stateId, number)))
+            .Select(number => ElectoralZone.Create(
                 stateId,
-                group.Key,
-                group.Select(item => (Guid?)item.MunicipalityId).FirstOrDefault()))
+                number,
+                FirstMunicipalityInZone(keys, municipalityIds, number)))
             .ToArray();
 
         if (newZones.Length == 0)
@@ -70,24 +61,34 @@ public sealed partial class TseImportSource
     }
 
     private async Task<IReadOnlyDictionary<(Guid, Guid, int), Guid>> EnsureSectionsAsync(
-        (TseSectionResultRow Row, Guid MunicipalityId)[] resolved,
+        TseStructureKeys keys,
         Guid stateId,
+        IReadOnlyDictionary<string, Guid?> municipalityIds,
         IReadOnlyDictionary<(Guid, int), Guid> zoneIds,
         CancellationToken cancellationToken)
     {
         var sectionIds = await structure.GetSectionIdsAsync(stateId, cancellationToken);
 
-        var newSections = resolved
-            .Select(item => (item.MunicipalityId, item.Row.ZoneNumber, item.Row.SectionNumber))
-            .Distinct()
-            .Select(key => (key, ZoneId: zoneIds.TryGetValue((stateId, key.ZoneNumber), out var zoneId)
-                ? zoneId
-                : (Guid?)null))
-            .Where(item => item.ZoneId is not null
-                           && !sectionIds.ContainsKey(
-                               (item.key.MunicipalityId, item.ZoneId!.Value, item.key.SectionNumber)))
+        var newSections = keys.Sections()
+            .Select(item => (
+                item,
+                MunicipalityId: municipalityIds.TryGetValue(item.Code, out var municipalityId)
+                    ? municipalityId
+                    : null,
+                ZoneId: zoneIds.TryGetValue((stateId, item.Zone), out var zoneId) ? zoneId : (Guid?)null))
+            .Where(item => item.MunicipalityId is not null
+                           && item.ZoneId is not null
+                           && !sectionIds.ContainsKey((
+                               item.MunicipalityId.Value, item.ZoneId!.Value, item.item.Section)))
+            // Deduplicate on the resolved key: two different TSE municipality codes can map to
+            // the same IBGE municipality, which would otherwise emit the same conflict target
+            // twice and make PostgreSQL reject the whole batch.
+            .GroupBy(item => (item.MunicipalityId!.Value, item.ZoneId!.Value, item.item.Section))
+            .Select(group => group.First())
             .Select(item => ElectoralSection.Create(
-                item.key.MunicipalityId, item.ZoneId!.Value, item.key.SectionNumber))
+                item.MunicipalityId!.Value,
+                item.ZoneId!.Value,
+                item.item.Section))
             .ToArray();
 
         if (newSections.Length == 0)
@@ -99,28 +100,31 @@ public sealed partial class TseImportSource
     }
 
     private async Task<IReadOnlyDictionary<(Guid, Guid?, int), Guid>> EnsurePollingPlacesAsync(
-        (TseSectionResultRow Row, Guid MunicipalityId)[] resolved,
+        TseStructureKeys keys,
         Guid stateId,
+        IReadOnlyDictionary<string, Guid?> municipalityIds,
         IReadOnlyDictionary<(Guid, int), Guid> zoneIds,
         CancellationToken cancellationToken)
     {
         var placeIds = await structure.GetPollingPlaceIdsAsync(stateId, cancellationToken);
 
-        var newPlaces = resolved
-            .Select(item => (item.Row, item.MunicipalityId, item.Row.ZoneNumber, item.Row.PollingPlaceNumber))
-            .Distinct()
-            .Select(item => (item, ZoneId: zoneIds.TryGetValue((stateId, item.ZoneNumber), out var zoneId)
-                ? zoneId
-                : (Guid?)null))
+        var newPlaces = keys.PollingPlaces()
+            .Select(item => (
+                item,
+                MunicipalityId: municipalityIds.TryGetValue(item.Code, out var municipalityId)
+                    ? municipalityId
+                    : null,
+                ZoneId: zoneIds.TryGetValue((stateId, item.Zone), out var zoneId) ? zoneId : (Guid?)null))
             .Where(item => item.ZoneId is not null
-                           && !placeIds.ContainsKey(
-                               (stateId, item.ZoneId, item.item.PollingPlaceNumber)))
+                           && !placeIds.ContainsKey((stateId, item.ZoneId, item.item.Place)))
+            .GroupBy(item => (item.ZoneId!.Value, item.item.Place))
+            .Select(group => group.First())
             .Select(item => PollingPlace.Create(
                 stateId,
-                item.item.MunicipalityId,
+                item.MunicipalityId,
                 item.ZoneId,
-                item.item.PollingPlaceNumber,
-                $"Local {item.item.PollingPlaceNumber}",
+                item.item.Place,
+                $"Local {item.item.Place}",
                 null, null, null, null, null))
             .ToArray();
 
@@ -132,8 +136,13 @@ public sealed partial class TseImportSource
         return await structure.GetPollingPlaceIdsAsync(stateId, cancellationToken);
     }
 
+    /// <summary>
+    /// Assigns each section of the file to its polling place for every election round the file
+    /// publishes. The previous implementation derived this from the full row set; the compact
+    /// key set carries the same information.
+    /// </summary>
     private async Task EnsureAssignmentsAsync(
-        IReadOnlyList<TseSectionResultRow> rows,
+        TseStructureKeys keys,
         Guid stateId,
         IReadOnlyDictionary<string, Guid?> municipalityIds,
         IReadOnlyDictionary<(Guid, int), Guid> zoneIds,
@@ -142,23 +151,40 @@ public sealed partial class TseImportSource
         TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
+        var roundIds = keys.Elections
+            .Select(election => electionLookup.TryGetRoundId(
+                election.ElectionCode, election.Round, out var roundId) ? roundId : (Guid?)null)
+            .Where(roundId => roundId is not null)
+            .Select(roundId => roundId!.Value)
+            .Distinct()
+            .ToArray();
+
+        if (roundIds.Length == 0)
+            return;
+
         var assignments = new Dictionary<(Guid RoundId, Guid SectionId), PollingPlaceSection>();
 
-        foreach (var roundGroup in rows.GroupBy(row => (row.ElectionCode, row.Round)))
+        foreach (var (code, zone, place) in keys.PollingPlaces())
         {
-            if (!electionLookup.TryGetRoundId(roundGroup.Key.ElectionCode, roundGroup.Key.Round, out var roundId))
+            if (!municipalityIds.TryGetValue(code, out var municipalityId)
+                || municipalityId is null)
+            {
+                continue;
+            }
+
+            if (!zoneIds.TryGetValue((stateId, zone), out var zoneId))
                 continue;
 
-            foreach (var row in roundGroup)
-            {
-                var resolved = ResolveAssignmentKey(
-                    row, stateId, municipalityIds, zoneIds, sectionIds, placeIds);
+            if (!placeIds.TryGetValue((stateId, zoneId, place), out var placeId))
+                continue;
 
-                if (resolved is not { } ids)
+            foreach (var section in keys.SectionsFor(code, zone))
+            {
+                if (!sectionIds.TryGetValue((municipalityId.Value, zoneId, section), out var sectionId))
                     continue;
 
-                assignments[(roundId, ids.SectionId)] =
-                    PollingPlaceSection.Create(roundId, ids.PlaceId, ids.SectionId);
+                foreach (var roundId in roundIds)
+                    assignments[(roundId, sectionId)] = PollingPlaceSection.Create(roundId, placeId, sectionId);
             }
         }
 
@@ -166,29 +192,26 @@ public sealed partial class TseImportSource
             await structure.UpsertAssignmentsAsync(assignments.Values.ToArray(), cancellationToken);
     }
 
-    private static (Guid SectionId, Guid PlaceId)? ResolveAssignmentKey(
-        TseSectionResultRow row,
-        Guid stateId,
+    /// <summary>
+    /// Picks the municipality a new zone is associated with. TSE zones map to one municipality
+    /// for the purposes of this table; taking the first resolved one preserves that intent
+    /// without inventing a relationship.
+    /// </summary>
+    private static Guid? FirstMunicipalityInZone(
+        TseStructureKeys keys,
         IReadOnlyDictionary<string, Guid?> municipalityIds,
-        IReadOnlyDictionary<(Guid, int), Guid> zoneIds,
-        IReadOnlyDictionary<(Guid, Guid, int), Guid> sectionIds,
-        IReadOnlyDictionary<(Guid, Guid?, int), Guid> placeIds)
+        int zone)
     {
-        if (!municipalityIds.TryGetValue(row.TseMunicipalityCode, out var municipalityId)
-            || municipalityId is null)
+        foreach (var code in keys.MunicipalityCodes)
         {
-            return null;
+            if (keys.SectionsFor(code, zone).Count > 0
+                && municipalityIds.TryGetValue(code, out var municipalityId)
+                && municipalityId is not null)
+            {
+                return municipalityId;
+            }
         }
 
-        if (!zoneIds.TryGetValue((stateId, row.ZoneNumber), out var zoneId))
-            return null;
-
-        if (!sectionIds.TryGetValue((municipalityId.Value, zoneId, row.SectionNumber), out var sectionId))
-            return null;
-
-        if (!placeIds.TryGetValue((stateId, zoneId, row.PollingPlaceNumber), out var placeId))
-            return null;
-
-        return (sectionId, placeId);
+        return null;
     }
 }

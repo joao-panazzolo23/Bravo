@@ -108,4 +108,13 @@ public static partial class WorkerLog
         ILogger logger,
         Guid jobId,
         string source);
+
+    [LoggerMessage(
+        EventId = 1113,
+        Level = LogLevel.Error,
+        Message = "Dispatching import job {JobId} raised an unexpected exception.")]
+    public static partial void WorkerDispatchException(
+        ILogger logger,
+        Guid jobId,
+        Exception exception);
 }

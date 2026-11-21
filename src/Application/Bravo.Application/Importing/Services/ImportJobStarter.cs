@@ -36,7 +36,8 @@ public sealed class ImportJobStarter(
             leaseDurationSeconds ?? settings.DefaultLeaseDurationSeconds
         );
 
-        if (!await jobs.CreateAsync(job, cancellationToken))
+        var isAlreadyRunning = !await jobs.CreateAsync(job, cancellationToken);
+        if (isAlreadyRunning)
         {
             return Result<ImportJobCreatedViewModel>.Conflict(
                 message: $"An import job for '{source}' and scope '{scope}' is already pending or running.");

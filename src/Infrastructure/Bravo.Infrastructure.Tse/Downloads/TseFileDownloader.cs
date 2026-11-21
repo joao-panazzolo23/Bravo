@@ -14,7 +14,8 @@ public sealed class TseFileDownloader(
     TseRateLimiter rateLimiter,
     TseBackoffPolicy backoff,
     IOptions<TseOptions> options,
-    ILogger<TseFileDownloader> logger)
+    ILogger<TseFileDownloader> logger
+)
 {
     private readonly TseOptions _options = options.Value;
 
@@ -35,13 +36,13 @@ public sealed class TseFileDownloader(
 
         try
         {
-            var result = await DownloadWithRetryAsync(relativeUrl, partial, cancellationToken);
+            var (SizeBytes, Sha256) = await DownloadWithRetryAsync(relativeUrl, partial, cancellationToken);
 
             File.Move(partial, destination, overwrite: true);
 
-            ProcessingLog.DownloadCompleted(logger, relativeUrl, result.SizeBytes, result.Sha256);
+            ProcessingLog.DownloadCompleted(logger, relativeUrl, SizeBytes, Sha256);
 
-            return new DownloadedFile(destination, fileName, result.SizeBytes, result.Sha256, relativeUrl);
+            return new DownloadedFile(destination, fileName, SizeBytes, Sha256, relativeUrl);
         }
         finally
         {
@@ -53,7 +54,8 @@ public sealed class TseFileDownloader(
     private async Task<(long SizeBytes, string Sha256)> DownloadWithRetryAsync(
         string relativeUrl,
         string partialPath,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Exception? last = null;
 
@@ -92,7 +94,8 @@ public sealed class TseFileDownloader(
     private async Task<(long SizeBytes, string Sha256)> DownloadOnceAsync(
         string relativeUrl,
         string partialPath,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         using var lease = await rateLimiter.AcquireAsync(cancellationToken);
 

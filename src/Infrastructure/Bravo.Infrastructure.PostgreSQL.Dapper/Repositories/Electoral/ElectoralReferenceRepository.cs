@@ -4,20 +4,24 @@ using Dapper;
 using Npgsql;
 using NpgsqlTypes;
 using Bravo.Domain.Electoral.Repositories;
+using Bravo.Infrastructure.PostgreSQL.Dapper.Bulk;
 
 namespace Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Electoral;
 
+/// <summary>
+/// Reference upserts over binary COPY and a temporary staging table.
+/// </summary>
+/// <remarks>
+/// This was the first repository migrated away from <c>jsonb_to_recordset</c> and is the pattern
+/// the rest of the persistence layer now follows: one transaction, a temporary staging table
+/// mirroring the destination types, binary COPY into it, then a single <c>INSERT ... SELECT</c>
+/// merge with the original conflict target.
+/// </remarks>
 internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
     : IElectoralReferenceRepository
 {
-    // Reference upserts stage rows in a temporary table with binary COPY, then merge with a
-    // single INSERT ... SELECT. Compared with the previous jsonb_to_recordset approach this
-    // avoids serializing every row to JSON, allocating the JSON string, and making PostgreSQL
-    // parse it back into records.
-    //
-    // Staging columns use the same types as their destinations, so an oversized value fails
-    // during COPY with the real database error (22001) instead of being truncated.
-    private const string CreateStagingOfficesSql = """
+    private static readonly BulkStagingTable OfficesStaging = new(
+        """
         CREATE TEMP TABLE staging_offices (
             "Id" uuid,
             "TseOfficeCode" integer,
@@ -25,29 +29,38 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
             "CreatedAt" timestamp with time zone,
             "UpdatedAt" timestamp with time zone
         ) ON COMMIT DROP;
-        """;
-
-    private const string CopyOfficesSql = """
+        """,
+        """
         COPY staging_offices ("Id", "TseOfficeCode", "Name", "CreatedAt", "UpdatedAt")
         FROM STDIN (FORMAT BINARY);
-        """;
+        """);
 
     // DISTINCT ON keeps a single row per conflict target. Without it, a batch containing the
     // same key twice would make PostgreSQL reject the whole statement with "ON CONFLICT DO
     // UPDATE command cannot affect row a second time". ctid ordering means the last staged row
     // wins, matching the accumulation order used by the import source.
+    //
+    // The WHERE guard skips a write when the name did not change. Reference data is re-read for
+    // every year, so most of these rows are identical on almost every run.
     private const string MergeOfficesSql = """
-        INSERT INTO "ElectoralOffices" ("Id", "TseOfficeCode", "Name", "CreatedAt", "UpdatedAt")
-        SELECT DISTINCT ON ("TseOfficeCode")
-               "Id", "TseOfficeCode", "Name", "CreatedAt", "UpdatedAt"
-        FROM staging_offices
-        ORDER BY "TseOfficeCode", "ctid" DESC
+        INSERT INTO "ElectoralOffices" AS target
+            ("Id", "TseOfficeCode", "Name", "CreatedAt", "UpdatedAt")
+        SELECT "Id", "TseOfficeCode", "Name", "CreatedAt", "UpdatedAt"
+        FROM (
+            SELECT DISTINCT ON ("TseOfficeCode")
+                   "Id", "TseOfficeCode", "Name", "CreatedAt", "UpdatedAt"
+            FROM staging_offices
+            ORDER BY "TseOfficeCode", "ctid" DESC
+        ) AS staged
+        ORDER BY "TseOfficeCode"
         ON CONFLICT ("TseOfficeCode") DO UPDATE SET
             "Name" = EXCLUDED."Name",
-            "UpdatedAt" = EXCLUDED."UpdatedAt";
+            "UpdatedAt" = EXCLUDED."UpdatedAt"
+        WHERE target."Name" IS DISTINCT FROM EXCLUDED."Name";
         """;
 
-    private const string CreateStagingPartiesSql = """
+    private static readonly BulkStagingTable PartiesStaging = new(
+        """
         CREATE TEMP TABLE staging_parties (
             "Id" uuid,
             "TsePartyNumber" integer,
@@ -56,26 +69,31 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
             "CreatedAt" timestamp with time zone,
             "UpdatedAt" timestamp with time zone
         ) ON COMMIT DROP;
-        """;
-
-    private const string CopyPartiesSql = """
+        """,
+        """
         COPY staging_parties ("Id", "TsePartyNumber", "Acronym", "Name", "CreatedAt", "UpdatedAt")
         FROM STDIN (FORMAT BINARY);
-        """;
+        """);
 
     private const string MergePartiesSql = """
-        INSERT INTO "PoliticalParties"
+        INSERT INTO "PoliticalParties" AS target
             ("Id", "TsePartyNumber", "Acronym", "Name", "CreatedAt", "UpdatedAt")
-        SELECT DISTINCT ON ("TsePartyNumber", "Acronym")
-               "Id", "TsePartyNumber", "Acronym", "Name", "CreatedAt", "UpdatedAt"
-        FROM staging_parties
-        ORDER BY "TsePartyNumber", "Acronym", "ctid" DESC
+        SELECT "Id", "TsePartyNumber", "Acronym", "Name", "CreatedAt", "UpdatedAt"
+        FROM (
+            SELECT DISTINCT ON ("TsePartyNumber", "Acronym")
+                   "Id", "TsePartyNumber", "Acronym", "Name", "CreatedAt", "UpdatedAt"
+            FROM staging_parties
+            ORDER BY "TsePartyNumber", "Acronym", "ctid" DESC
+        ) AS staged
+        ORDER BY "TsePartyNumber", "Acronym"
         ON CONFLICT ("TsePartyNumber", "Acronym") DO UPDATE SET
             "Name" = EXCLUDED."Name",
-            "UpdatedAt" = EXCLUDED."UpdatedAt";
+            "UpdatedAt" = EXCLUDED."UpdatedAt"
+        WHERE target."Name" IS DISTINCT FROM EXCLUDED."Name";
         """;
 
-    private const string CreateStagingFederationsSql = """
+    private static readonly BulkStagingTable FederationsStaging = new(
+        """
         CREATE TEMP TABLE staging_federations (
             "Id" uuid,
             "TseFederationNumber" integer,
@@ -85,27 +103,32 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
             "CreatedAt" timestamp with time zone,
             "UpdatedAt" timestamp with time zone
         ) ON COMMIT DROP;
-        """;
-
-    private const string CopyFederationsSql = """
+        """,
+        """
         COPY staging_federations
             ("Id", "TseFederationNumber", "Name", "Acronym", "Composition", "CreatedAt", "UpdatedAt")
         FROM STDIN (FORMAT BINARY);
-        """;
+        """);
 
     private const string MergeFederationsSql = """
-        INSERT INTO "Federations"
+        INSERT INTO "Federations" AS target
             ("Id", "TseFederationNumber", "Name", "Acronym", "Composition", "CreatedAt", "UpdatedAt")
-        SELECT DISTINCT ON ("TseFederationNumber")
-               "Id", "TseFederationNumber", "Name", "Acronym", "Composition",
-               "CreatedAt", "UpdatedAt"
-        FROM staging_federations
-        ORDER BY "TseFederationNumber", "ctid" DESC
+        SELECT "Id", "TseFederationNumber", "Name", "Acronym", "Composition", "CreatedAt", "UpdatedAt"
+        FROM (
+            SELECT DISTINCT ON ("TseFederationNumber")
+                   "Id", "TseFederationNumber", "Name", "Acronym", "Composition",
+                   "CreatedAt", "UpdatedAt"
+            FROM staging_federations
+            ORDER BY "TseFederationNumber", "ctid" DESC
+        ) AS staged
+        ORDER BY "TseFederationNumber"
         ON CONFLICT ("TseFederationNumber") DO UPDATE SET
             "Name" = EXCLUDED."Name",
             "Acronym" = EXCLUDED."Acronym",
             "Composition" = EXCLUDED."Composition",
-            "UpdatedAt" = EXCLUDED."UpdatedAt";
+            "UpdatedAt" = EXCLUDED."UpdatedAt"
+        WHERE ROW(target."Name", target."Acronym", target."Composition")
+              IS DISTINCT FROM ROW(EXCLUDED."Name", EXCLUDED."Acronym", EXCLUDED."Composition");
         """;
 
     private const string SelectOfficesSql = """
@@ -120,97 +143,30 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
         SELECT "TseFederationNumber", "Id" FROM "Federations";
         """;
 
-    public async Task<int> UpsertOfficesAsync(
+    public Task<int> UpsertOfficesAsync(
         IReadOnlyCollection<ElectoralOffice> offices,
         CancellationToken cancellationToken = default)
-    {
-        if (offices.Count == 0)
-            return 0;
+        => offices.Count == 0
+            ? Task.FromResult(0)
+            : BulkCopy.UpsertAsync(
+                dataSource, OfficesStaging, offices, WriteOfficeAsync, MergeOfficesSql, cancellationToken);
 
-        return await BulkUpsertAsync(
-            offices,
-            CreateStagingOfficesSql,
-            CopyOfficesSql,
-            MergeOfficesSql,
-            WriteOfficeAsync,
-            cancellationToken);
-    }
-
-    public async Task<int> UpsertPartiesAsync(
+    public Task<int> UpsertPartiesAsync(
         IReadOnlyCollection<PoliticalParty> parties,
         CancellationToken cancellationToken = default)
-    {
-        if (parties.Count == 0)
-            return 0;
+        => parties.Count == 0
+            ? Task.FromResult(0)
+            : BulkCopy.UpsertAsync(
+                dataSource, PartiesStaging, parties, WritePartyAsync, MergePartiesSql, cancellationToken);
 
-        return await BulkUpsertAsync(
-            parties,
-            CreateStagingPartiesSql,
-            CopyPartiesSql,
-            MergePartiesSql,
-            WritePartyAsync,
-            cancellationToken);
-    }
-
-    public async Task<int> UpsertFederationsAsync(
+    public Task<int> UpsertFederationsAsync(
         IReadOnlyCollection<Federation> federations,
         CancellationToken cancellationToken = default)
-    {
-        if (federations.Count == 0)
-            return 0;
-
-        return await BulkUpsertAsync(
-            federations,
-            CreateStagingFederationsSql,
-            CopyFederationsSql,
-            MergeFederationsSql,
-            WriteFederationAsync,
-            cancellationToken);
-    }
-
-    /// <summary>
-    /// Creates a temp staging table, streams rows into it with binary COPY, then merges into the
-    /// destination. Everything runs in one transaction, so a COPY or merge failure leaves the
-    /// destination untouched and drops the staging table.
-    /// </summary>
-    private async Task<int> BulkUpsertAsync<T>(
-        IReadOnlyCollection<T> records,
-        string createStagingSql,
-        string copySql,
-        string mergeSql,
-        Func<NpgsqlBinaryImporter, T, CancellationToken, Task> writeRow,
-        CancellationToken cancellationToken)
-    {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-        await using (var create = new NpgsqlCommand(createStagingSql, connection, transaction))
-        {
-            await create.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        await using (var importer = await connection.BeginBinaryImportAsync(copySql, cancellationToken))
-        {
-            foreach (var record in records)
-            {
-                await importer.StartRowAsync(cancellationToken);
-                await writeRow(importer, record, cancellationToken);
-            }
-
-            await importer.CompleteAsync(cancellationToken);
-        }
-
-        int affected;
-
-        await using (var merge = new NpgsqlCommand(mergeSql, connection, transaction))
-        {
-            affected = await merge.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-
-        return affected;
-    }
+        => federations.Count == 0
+            ? Task.FromResult(0)
+            : BulkCopy.UpsertAsync(
+                dataSource, FederationsStaging, federations, WriteFederationAsync,
+                MergeFederationsSql, cancellationToken);
 
     private static async Task WriteOfficeAsync(
         NpgsqlBinaryImporter importer,
@@ -220,8 +176,8 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
         await importer.WriteAsync(office.Id, NpgsqlDbType.Uuid, cancellationToken);
         await importer.WriteAsync(office.TseOfficeCode, NpgsqlDbType.Integer, cancellationToken);
         await importer.WriteAsync(office.Name, NpgsqlDbType.Text, cancellationToken);
-        await importer.WriteAsync(AsUtc(office.CreatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
-        await importer.WriteAsync(AsUtc(office.UpdatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
+        await importer.WriteAsync(BulkCopy.AsUtc(office.CreatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
+        await importer.WriteAsync(BulkCopy.AsUtc(office.UpdatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
     }
 
     private static async Task WritePartyAsync(
@@ -233,8 +189,8 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
         await importer.WriteAsync(party.TsePartyNumber, NpgsqlDbType.Integer, cancellationToken);
         await importer.WriteAsync(party.Acronym, NpgsqlDbType.Text, cancellationToken);
         await importer.WriteAsync(party.Name, NpgsqlDbType.Text, cancellationToken);
-        await importer.WriteAsync(AsUtc(party.CreatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
-        await importer.WriteAsync(AsUtc(party.UpdatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
+        await importer.WriteAsync(BulkCopy.AsUtc(party.CreatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
+        await importer.WriteAsync(BulkCopy.AsUtc(party.UpdatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
     }
 
     private static async Task WriteFederationAsync(
@@ -246,24 +202,10 @@ internal sealed class ElectoralReferenceRepository(NpgsqlDataSource dataSource)
         await importer.WriteAsync(federation.TseFederationNumber, NpgsqlDbType.Integer, cancellationToken);
         await importer.WriteAsync(federation.Name, NpgsqlDbType.Text, cancellationToken);
         await importer.WriteAsync(federation.Acronym, NpgsqlDbType.Text, cancellationToken);
-
-        if (federation.Composition is null)
-            await importer.WriteNullAsync(cancellationToken);
-        else
-            await importer.WriteAsync(federation.Composition, NpgsqlDbType.Text, cancellationToken);
-
-        await importer.WriteAsync(AsUtc(federation.CreatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
-        await importer.WriteAsync(AsUtc(federation.UpdatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
+        await importer.WriteNullableAsync(federation.Composition, NpgsqlDbType.Text, cancellationToken);
+        await importer.WriteAsync(BulkCopy.AsUtc(federation.CreatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
+        await importer.WriteAsync(BulkCopy.AsUtc(federation.UpdatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
     }
-
-    /// <summary>
-    /// Npgsql requires UTC for <c>timestamptz</c>. Entities are created from
-    /// <see cref="DateTime.UtcNow"/>, so an unspecified kind is already UTC in practice.
-    /// </summary>
-    private static DateTime AsUtc(DateTime value)
-        => value.Kind == DateTimeKind.Utc
-            ? value
-            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
 
     public async Task<IReadOnlyDictionary<int, Guid>> GetOfficeIdsAsync(
         CancellationToken cancellationToken = default)

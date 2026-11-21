@@ -29,6 +29,10 @@ public class PollingPlace : Entity
         decimal? latitude,
         decimal? longitude)
     {
+        // TSE uses non-positive location numbers as sentinels meaning "not published" (1998
+        // files use -3 for every row). A sentinel is not a location, so the entity refuses it;
+        // the import filters those rows out before reaching this factory instead of storing
+        // meaningless identifiers.
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(tsePollingPlaceNumber);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 

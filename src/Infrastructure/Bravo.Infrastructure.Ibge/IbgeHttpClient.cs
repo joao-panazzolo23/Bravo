@@ -1,4 +1,4 @@
-namespace Bravo.Infrastructure.Acquisition;
+namespace Bravo.Infrastructure.Ibge;
 
 ///???
 internal static class IbgeHttpClient

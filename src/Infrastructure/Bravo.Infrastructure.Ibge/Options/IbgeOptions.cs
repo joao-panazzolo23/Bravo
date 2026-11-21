@@ -1,4 +1,4 @@
-namespace Bravo.Infrastructure.Acquisition.Options;
+namespace Bravo.Infrastructure.Ibge.Options;
 
 public class IbgeOptions
 {

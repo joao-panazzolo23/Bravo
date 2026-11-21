@@ -1,6 +1,4 @@
 using Bravo.Domain.Electoral.Entities;
-using Bravo.Domain.Electoral.Repositories;
-
 namespace Bravo.Domain.Electoral.Repositories;
 
 public interface ICandidateRepository

@@ -1,6 +1,3 @@
-using Bravo.Domain.Electoral.Entities;
-using Bravo.Domain.Electoral.Models;
-
 namespace Bravo.Application.Importing.Sources.Tse;
 
 /// <summary>
@@ -12,21 +9,14 @@ namespace Bravo.Application.Importing.Sources.Tse;
 /// state, so every map is state-scoped. One snapshot is shared by the structure-ensuring code
 /// and the row resolver, which removes the duplicate nationwide reads the import used to make.
 /// </remarks>
-public sealed class TseStructureIds
+public sealed class TseStructureIds(
+    IReadOnlyDictionary<(Guid StateId, int Number), Guid> zoneIds,
+    IReadOnlyDictionary<(Guid MunicipalityId, Guid ZoneId, int Number), Guid> sectionIds,
+    IReadOnlyDictionary<(Guid StateId, Guid? ZoneId, int Number), Guid> pollingPlaceIds)
 {
-    public TseStructureIds(
-        IReadOnlyDictionary<(Guid StateId, int Number), Guid> zoneIds,
-        IReadOnlyDictionary<(Guid MunicipalityId, Guid ZoneId, int Number), Guid> sectionIds,
-        IReadOnlyDictionary<(Guid StateId, Guid? ZoneId, int Number), Guid> pollingPlaceIds)
-    {
-        ZoneIds = zoneIds;
-        SectionIds = sectionIds;
-        PollingPlaceIds = pollingPlaceIds;
-    }
+    public IReadOnlyDictionary<(Guid StateId, int Number), Guid> ZoneIds { get; } = zoneIds;
 
-    public IReadOnlyDictionary<(Guid StateId, int Number), Guid> ZoneIds { get; }
+    public IReadOnlyDictionary<(Guid MunicipalityId, Guid ZoneId, int Number), Guid> SectionIds { get; } = sectionIds;
 
-    public IReadOnlyDictionary<(Guid MunicipalityId, Guid ZoneId, int Number), Guid> SectionIds { get; }
-
-    public IReadOnlyDictionary<(Guid StateId, Guid? ZoneId, int Number), Guid> PollingPlaceIds { get; }
+    public IReadOnlyDictionary<(Guid StateId, Guid? ZoneId, int Number), Guid> PollingPlaceIds { get; } = pollingPlaceIds;
 }

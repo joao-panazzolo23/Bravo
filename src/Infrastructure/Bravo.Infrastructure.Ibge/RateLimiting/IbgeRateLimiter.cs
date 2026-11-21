@@ -1,7 +1,7 @@
 using System.Threading.RateLimiting;
-using Bravo.Infrastructure.Acquisition.Options;
+using Bravo.Infrastructure.Ibge.Options;
 
-namespace Bravo.Infrastructure.Acquisition.RateLimiting;
+namespace Bravo.Infrastructure.Ibge.RateLimiting;
 
 public sealed class IbgeRateLimiter : IDisposable
 {

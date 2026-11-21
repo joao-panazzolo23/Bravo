@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Bravo.Application.Importing.Services;
 using Bravo.Application.Logging;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Application.Electoral;
@@ -17,9 +19,8 @@ public sealed partial class TseImportSource
     /// Imports section-level structure and voting results for every (year, state) pair.
     /// </summary>
     /// <remarks>
-    /// Pairs are independent, so they run concurrently. Every stored result carries the active
-    /// dataset version, which is what keeps a corrected archive from double-counting votes when
-    /// the whole import is re-executed.
+    /// Pairs are independent, so they run concurrently, but the number actually in flight is
+    /// bounded by the process-wide resource governor rather than by this loop alone.
     /// </remarks>
     private async Task ImportResultsAsync(
         ImportExecutionContext context,
@@ -49,6 +50,10 @@ public sealed partial class TseImportSource
             async (pair, token) =>
             {
                 using var scope = logger.BeginOperationScope(year: pair.Year, state: pair.State);
+
+                // A result scope means one large CSV being streamed. The governor bounds how
+                // many of those exist at once across every job in the process.
+                using var permit = await resources.AcquireResultScopeAsync(token);
 
                 try
                 {
@@ -96,9 +101,6 @@ public sealed partial class TseImportSource
 
             await datasetVersions.CompleteAsync(version.Id, cancellationToken);
 
-            PersistenceLog.SectionResultsUpserted(
-                logger, imported, year, state);
-
             return imported;
         }
         catch
@@ -108,6 +110,15 @@ public sealed partial class TseImportSource
         }
     }
 
+    /// <summary>
+    /// Streams one results file twice: once to collect the compact geographic keys structure
+    /// preparation needs, then again to transform and persist rows through a bounded pipeline.
+    /// </summary>
+    /// <remarks>
+    /// The second read is sequential and costs a fraction of the file's parse time, and it is
+    /// what lets the import keep memory proportional to the distinct geography of a state
+    /// instead of to its 18 million result rows.
+    /// </remarks>
     private async Task<int> ImportResultRowsAsync(
         int year,
         string state,
@@ -117,58 +128,236 @@ public sealed partial class TseImportSource
         int batchSize,
         CancellationToken cancellationToken)
     {
-        await using var stream = File.OpenRead(dataset.FilePath);
-        var rows = sectionReader.Read(stream, dataset.LayoutVersion);
-
-        if (rows.Count == 0)
-            return 0;
+        var started = Stopwatch.GetTimestamp();
 
         var stateId = await ResolveResultStateIdAsync(state, cancellationToken);
-        var municipalityIds = await ResolveMunicipalitiesAsync(rows, stateId, year, cancellationToken);
+
+        // Pass 1: geographic keys only.
+        var keys = await CollectStructureKeysAsync(dataset, cancellationToken);
+
+        if (keys.SectionCount == 0)
+            return 0;
+
+        var municipalityIds = await ResolveMunicipalitiesAsync(keys, stateId, year, cancellationToken);
 
         var officeIds = await reference.GetOfficeIdsAsync(cancellationToken);
         var partyIds = await reference.GetPartyIdsAsync(cancellationToken);
 
-        // Structure is round-independent, so it is ensured once per file. The scoped reads are
-        // shared between ensuring structure and resolving rows, so each map is fetched once.
         var structureIds = await EnsureStructureAsync(
-            rows, stateId, municipalityIds, electionLookup, cancellationToken);
+            keys, stateId, municipalityIds, electionLookup, cancellationToken);
 
         var partyByNumber = partyIds
             .GroupBy(entry => entry.Key.Number)
             .ToDictionary(group => group.Key, group => group.First().Value);
 
-        // Candidate maps are fetched once per (election, state) file before the row loop, so
-        // no database access happens while resolving individual records.
-        var candidateCache = await LoadCandidateIdsAsync(
-            rows, stateId, electionLookup, cancellationToken);
+        // Pass 2: stream rows through a bounded producer/consumer pipeline. The batch builder
+        // allocates one buffer at a time and hands ownership to the channel, so memory never
+        // scales with the file.
+        var imported = await StreamResultsAsync(
+            dataset,
+            year,
+            state,
+            stateId,
+            version.Id,
+            keys,
+            municipalityIds,
+            structureIds,
+            officeIds,
+            partyByNumber,
+            electionLookup,
+            batchSize,
+            cancellationToken);
 
-        var buffer = NewResultBuffer();
+        var elapsed = Stopwatch.GetElapsedTime(started);
 
-        var imported = 0;
+        PersistenceLog.SectionResultsUpserted(logger, imported, year, state);
 
-        foreach (var row in rows)
-        {
-            var resolved = ResolveResultRow(
-                row, stateId, municipalityIds, structureIds, officeIds,
-                partyByNumber, electionLookup, candidateCache);
-
-            if (resolved is not { } key)
-                continue;
-
-            buffer[key] = buffer.TryGetValue(key, out var existing)
-                ? existing + row.Votes
-                : row.Votes;
-
-            if (buffer.Count < batchSize)
-                continue;
-
-            imported += await FlushResultsAsync(buffer, version.Id, cancellationToken);
-        }
-
-        imported += await FlushResultsAsync(buffer, version.Id, cancellationToken);
+        ResourceLog.ResultScopeCompleted(
+            logger,
+            year,
+            state,
+            keys.SectionCount,
+            elapsed.TotalMilliseconds,
+            keys.SectionCount / Math.Max(elapsed.TotalSeconds, 0.001));
 
         return imported;
+    }
+
+    private async Task<TseStructureKeys> CollectStructureKeysAsync(
+        AcquiredDataset dataset,
+        CancellationToken cancellationToken)
+    {
+        var keys = new TseStructureKeys();
+
+        // A reader permit is held only while rows are being pulled, so the two passes of one
+        // scope do not pin two reader slots permanently.
+        using (await resources.AcquireCsvReaderAsync(cancellationToken))
+        {
+            await using var stream = File.OpenRead(dataset.FilePath);
+
+            await foreach (var row in sectionReader.ReadAsync(
+                               stream, dataset.LayoutVersion, cancellationToken))
+            {
+                // A non-positive location number is a source sentinel, not a place. Warn once
+                // per scope so the data gap is visible without logging a line per row.
+                if (row.PollingPlaceNumber <= 0 && !keys.SawSentinelPollingPlace)
+                {
+                    keys.SawSentinelPollingPlace = true;
+
+                    ResourceLog.InvalidPollingPlaceSkipped(
+                        logger, row.PollingPlaceNumber, row.Year, row.StateAcronym);
+                }
+
+                keys.Observe(row);
+            }
+        }
+
+        return keys;
+    }
+
+    private async Task<int> StreamResultsAsync(
+        AcquiredDataset dataset,
+        int year,
+        string state,
+        Guid stateId,
+        Guid versionId,
+        TseStructureKeys keys,
+        IReadOnlyDictionary<string, Guid?> municipalityIds,
+        TseStructureIds structureIds,
+        IReadOnlyDictionary<int, Guid> officeIds,
+        IReadOnlyDictionary<int, Guid> partyByNumber,
+        TseElectionLookup electionLookup,
+        int batchSize,
+        CancellationToken cancellationToken)
+    {
+        var candidateIds = await LoadCandidateIdsAsync(keys, stateId, electionLookup, cancellationToken);
+
+        long imported = 0;
+
+        await BoundedPipeline.RunAsync<ResultBatch>(
+            resources.MaxInFlightBatchesPerScope,
+            async (writer, token) =>
+            {
+                using var readerPermit = await resources.AcquireCsvReaderAsync(token);
+
+                await using var stream = File.OpenRead(dataset.FilePath);
+
+                var buffer = NewResultBuffer();
+                var cursor = new ResolutionCursor(
+                    stateId, municipalityIds, structureIds, officeIds, partyByNumber,
+                    electionLookup, candidateIds);
+
+                await foreach (var row in sectionReader.ReadAsync(stream, dataset.LayoutVersion, token))
+                {
+                    if (!cursor.TryResolve(row, out var key))
+                        continue;
+
+                    buffer[key] = buffer.TryGetValue(key, out var existing)
+                        ? existing + row.Votes
+                        : row.Votes;
+
+                    if (buffer.Count < batchSize)
+                        continue;
+
+                    // Ownership of the buffer moves to the channel; a fresh one is allocated so
+                    // the consumer never observes mutations.
+                    await writer.WriteAsync(new ResultBatch(buffer), token);
+                    buffer = NewResultBuffer();
+                }
+
+                if (buffer.Count > 0)
+                    await writer.WriteAsync(new ResultBatch(buffer), token);
+            },
+            async (batch, token) =>
+            {
+                using var persistencePermit = await resources.AcquirePersistenceAsync(token);
+
+                await FlushResultsAsync(batch, versionId, token);
+
+                Interlocked.Add(ref imported, batch.Count);
+            },
+            cancellationToken);
+
+        return (int)Interlocked.Read(ref imported);
+    }
+
+    /// <summary>
+    /// Resolves rows to result keys using only preloaded maps. Held per pass, never shared, so
+    /// it can be a plain mutable cursor without synchronisation.
+    /// </summary>
+    private readonly struct ResolutionCursor(
+        Guid stateId,
+        IReadOnlyDictionary<string, Guid?> municipalityIds,
+        TseStructureIds structureIds,
+        IReadOnlyDictionary<int, Guid> officeIds,
+        IReadOnlyDictionary<int, Guid> partyByNumber,
+        TseElectionLookup electionLookup,
+        IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, Guid>> candidateIds)
+    {
+        public bool TryResolve(
+            TseSectionResultRow row,
+            out (Guid RoundId, Guid SectionId, Guid OfficeId, VoteType Type, Guid? CandidateId, Guid? PartyId, int Ballot) key)
+        {
+            key = default;
+
+            if (!municipalityIds.TryGetValue(row.TseMunicipalityCode, out var municipalityId)
+                || municipalityId is null)
+            {
+                return false;
+            }
+
+            if (!structureIds.ZoneIds.TryGetValue((stateId, row.ZoneNumber), out var zoneId))
+                return false;
+
+            if (!structureIds.SectionIds.TryGetValue(
+                    (municipalityId.Value, zoneId, row.SectionNumber), out var sectionId))
+            {
+                return false;
+            }
+
+            if (!officeIds.TryGetValue(row.OfficeCode, out var officeId))
+                return false;
+
+            if (!electionLookup.TryGetElectionId(row.ElectionCode, out var electionId))
+                return false;
+
+            if (!electionLookup.TryGetRoundId(row.ElectionCode, row.Round, out var roundId))
+                return false;
+
+            var voteType = TseVoteClassifier.Classify(row.BallotNumber, row.CandidateSequential);
+
+            if (voteType == VoteType.Nominal)
+            {
+                if (candidateIds.TryGetValue(electionId, out var bySequential)
+                    && bySequential.TryGetValue(row.CandidateSequential!, out var candidateId))
+                {
+                    key = (roundId, sectionId, officeId, voteType, candidateId, null, row.BallotNumber);
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (voteType == VoteType.Party)
+            {
+                if (partyByNumber.TryGetValue(row.BallotNumber, out var partyId))
+                {
+                    key = (roundId, sectionId, officeId, voteType, null, partyId, row.BallotNumber);
+                    return true;
+                }
+
+                return false;
+            }
+
+            key = (roundId, sectionId, officeId, voteType, null, null, row.BallotNumber);
+            return true;
+        }
+    }
+
+    private sealed record ResultBatch(
+        Dictionary<(Guid RoundId, Guid SectionId, Guid OfficeId, VoteType Type, Guid? CandidateId, Guid? PartyId, int Ballot), long> Values)
+    {
+        public int Count => Values.Count;
     }
 
     private async Task<Guid> ResolveResultStateIdAsync(
@@ -186,40 +375,29 @@ public sealed partial class TseImportSource
                 $"TSE state '{state}' is not present in the geography import.");
         }
 
-        return await syntheticScopes.EnsureAsync(
-            state,
-            geography.UpsertStatesAsync,
-            cancellationToken);
+        return await syntheticScopes.EnsureAsync(state, cancellationToken);
     }
 
     /// <summary>
     /// Loads the candidate-sequential map for every election in the file that casts nominal
     /// votes, once each.
     /// </summary>
-    /// <remarks>
-    /// Nominal results need candidate identifiers, and a file spans a bounded set of elections.
-    /// Fetching them up front keeps record resolution free of database access while issuing at
-    /// most one query per distinct election with nominal votes.
-    /// </remarks>
     private async Task<IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, Guid>>> LoadCandidateIdsAsync(
-        IReadOnlyList<TseSectionResultRow> rows,
+        TseStructureKeys keys,
         Guid stateId,
         TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
-        var electionCodes = rows
-            .Where(row => TseVoteClassifier.Classify(row.BallotNumber, row.CandidateSequential)
-                          == VoteType.Nominal)
-            .Select(row => row.ElectionCode)
-            .Distinct();
-
         var loaded = new Dictionary<Guid, IReadOnlyDictionary<string, Guid>>();
 
-        foreach (var code in electionCodes)
+        foreach (var (electionCode, _) in keys.Elections)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!electionLookup.TryGetElectionId(code, out var electionId))
+            if (!electionLookup.TryGetElectionId(electionCode, out var electionId))
+                continue;
+
+            if (loaded.ContainsKey(electionId))
                 continue;
 
             loaded[electionId] = await candidates.GetCandidateIdsAsync(
@@ -229,80 +407,18 @@ public sealed partial class TseImportSource
         return loaded;
     }
 
-    /// <summary>
-    /// Maps one source row to its result key, or null when a reference is genuinely missing.
-    /// </summary>
-    /// <remarks>
-    /// The caller accumulates votes per key, so duplicates inside one file are summed rather
-    /// than overwritten. Every reference comes from a map loaded before the loop, so this
-    /// method never touches the database.
-    /// </remarks>
-    private (Guid RoundId, Guid SectionId, Guid OfficeId, VoteType Type, Guid? CandidateId, Guid? PartyId, int Ballot)? ResolveResultRow(
-        TseSectionResultRow row,
-        Guid stateId,
-        IReadOnlyDictionary<string, Guid?> municipalityIds,
-        TseStructureIds structureIds,
-        IReadOnlyDictionary<int, Guid> officeIds,
-        IReadOnlyDictionary<int, Guid> partyByNumber,
-        TseElectionLookup electionLookup,
-        IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, Guid>> candidateIds)
-    {
-        if (!municipalityIds.TryGetValue(row.TseMunicipalityCode, out var municipalityId)
-            || municipalityId is null)
-        {
-            return null;
-        }
-
-        if (!structureIds.ZoneIds.TryGetValue((stateId, row.ZoneNumber), out var zoneId))
-            return null;
-
-        if (!structureIds.SectionIds.TryGetValue(
-                (municipalityId.Value, zoneId, row.SectionNumber), out var sectionId))
-        {
-            return null;
-        }
-
-        if (!officeIds.TryGetValue(row.OfficeCode, out var officeId))
-            return null;
-
-        if (!electionLookup.TryGetElectionId(row.ElectionCode, out var electionId))
-            return null;
-
-        if (!electionLookup.TryGetRoundId(row.ElectionCode, row.Round, out var roundId))
-            return null;
-
-        var voteType = TseVoteClassifier.Classify(row.BallotNumber, row.CandidateSequential);
-
-        if (voteType == VoteType.Nominal)
-        {
-            return candidateIds.TryGetValue(electionId, out var bySequential)
-                   && bySequential.TryGetValue(row.CandidateSequential!, out var candidateId)
-                ? (roundId, sectionId, officeId, voteType, candidateId, null, row.BallotNumber)
-                : null;
-        }
-
-        if (voteType == VoteType.Party)
-        {
-            return partyByNumber.TryGetValue(row.BallotNumber, out var partyId)
-                ? (roundId, sectionId, officeId, voteType, null, partyId, row.BallotNumber)
-                : null;
-        }
-
-        return (roundId, sectionId, officeId, voteType, null, null, row.BallotNumber);
-    }
-
     private static Dictionary<(Guid, Guid, Guid, VoteType, Guid?, Guid?, int), long> NewResultBuffer()
         => [];
 
-    private async Task<int> FlushResultsAsync(
-        Dictionary<(Guid RoundId, Guid SectionId, Guid OfficeId, VoteType Type, Guid? CandidateId, Guid? PartyId, int Ballot), long> buffer,
+    private async Task FlushResultsAsync(
+        ResultBatch batch,
         Guid versionId,
         CancellationToken cancellationToken)
     {
-        if (buffer.Count == 0)
-            return 0;
+        if (batch.Count == 0)
+            return;
 
-        var batch = buffer
+        var entities = batch.Values
             .Select(entry => ElectionResult.Create(
                 entry.Key.RoundId,
                 entry.Key.SectionId,
@@ -315,23 +431,20 @@ public sealed partial class TseImportSource
                 versionId))
             .ToArray();
 
-        await results.UpsertResultsAsync(batch, cancellationToken);
+        await results.UpsertResultsAsync(entities, cancellationToken);
 
-        var count = buffer.Count;
-        buffer.Clear();
-
-        return count;
+        // Release the retained references as soon as the batch is durable.
+        batch.Values.Clear();
     }
 
     private async Task<IReadOnlyDictionary<string, Guid?>> ResolveMunicipalitiesAsync(
-        IReadOnlyList<TseSectionResultRow> rows,
+        TseStructureKeys keys,
         Guid stateId,
         int year,
         CancellationToken cancellationToken)
     {
-        var observations = rows
-            .Select(row => (row.TseMunicipalityCode, row.MunicipalityName, stateId))
-            .Distinct()
+        var observations = keys.MunicipalityCodes
+            .Select(code => (RawCode: code, MunicipalityName: keys.MunicipalityName(code), StateId: stateId))
             .ToArray();
 
         var resolved = await municipalityResolver.ResolveAsync(
