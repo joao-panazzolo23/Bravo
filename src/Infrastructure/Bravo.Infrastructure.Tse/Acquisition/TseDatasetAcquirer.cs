@@ -1,5 +1,5 @@
 using Bravo.Domain.Electoral.Services;
-using Bravo.Infrastructure.Tse.Downloads;
+using Bravo.Infrastructure.Tse.Clients;
 using Bravo.Infrastructure.Tse.Extraction;
 using Bravo.Infrastructure.Tse.Options;
 using Microsoft.Extensions.Options;
@@ -7,24 +7,23 @@ using Microsoft.Extensions.Options;
 namespace Bravo.Infrastructure.Tse.Acquisition;
 
 internal sealed class TseDatasetAcquirer(
-    TseFileDownloader downloader,
+    TseHttpClient client,
     TseArchiveExtractor extractor,
     IOptions<TseOptions> options) : ITseDatasetAcquirer
 {
     private const string CandidatePrefix = "consulta_cand_";
-    private const string ResultsPrefix = "votacao_secao_";
 
     public async Task<IReadOnlyList<AcquiredCandidateFile>> AcquireCandidatesAsync(
         int year,
         CancellationToken cancellationToken = default)
     {
-        var archiveUrl = $"estatistica/sead/odsele/consulta_cand/{CandidatePrefix}{year}.zip";
-        var archiveName = $"{CandidatePrefix}{year}.zip";
+        var tempDirectory = options.Value.TempDirectory;
 
-        var downloaded = await downloader.DownloadAsync(archiveUrl, archiveName, cancellationToken);
+        var downloaded = await client.DownloadCandidateArchiveAsync(
+            year, tempDirectory, cancellationToken);
 
         var destination = Path.Combine(
-            options.Value.TempDirectory,
+            tempDirectory,
             $"cand-{year}-{Guid.CreateVersion7():N}");
 
         var extracted = extractor.Extract(
@@ -66,13 +65,13 @@ internal sealed class TseDatasetAcquirer(
         CancellationToken cancellationToken = default)
     {
         var upper = state.ToUpperInvariant();
-        var archiveUrl = $"estatistica/sead/odsele/votacao_secao/{ResultsPrefix}{year}_{upper}.zip";
-        var archiveName = $"{ResultsPrefix}{year}_{upper}.zip";
+        var tempDirectory = options.Value.TempDirectory;
 
-        var downloaded = await downloader.DownloadAsync(archiveUrl, archiveName, cancellationToken);
+        var downloaded = await client.DownloadSectionResultsArchiveAsync(
+            year, upper, tempDirectory, cancellationToken);
 
         var destination = Path.Combine(
-            options.Value.TempDirectory,
+            tempDirectory,
             $"results-{year}-{upper}-{Guid.CreateVersion7():N}");
 
         var extracted = extractor.Extract(
@@ -82,7 +81,7 @@ internal sealed class TseDatasetAcquirer(
 
         var match = extracted.FirstOrDefault()
             ?? throw new TseArchiveException(
-                $"Archive '{archiveUrl}' contains no entry for state '{upper}'.");
+                $"Archive '{downloaded.SourceUrl}' contains no entry for state '{upper}'.");
 
         return new AcquiredDataset(
             match.FilePath,

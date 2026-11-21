@@ -139,9 +139,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Property<int>("BallotNumber")
                         .HasColumnType("integer");
 
-                    b.Property<DateOnly?>("BirthDate")
-                        .HasColumnType("date");
-
                     b.Property<Guid?>("CandidateIdentityId")
                         .HasColumnType("uuid");
 
@@ -161,10 +158,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Property<Guid?>("FederationId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Gender")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -179,10 +172,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
 
                     b.Property<Guid?>("PartyId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("Race")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("RegistrationStatus")
                         .HasMaxLength(100)

@@ -40,7 +40,7 @@ public static class DocumentationExtensions
                .SortTagsAlphabetically()
                .SortOperationsByMethod()
                .AddPreferredSecuritySchemes("bearerAuth")
-               .WithTitle("Bravo API V1.0 - Nomad Innovation")
+               .WithTitle("Bravo API V1.0")
                .WithOpenApiRoutePattern("/openapi/{documentName}.json")
                .DisableTelemetry();
         })

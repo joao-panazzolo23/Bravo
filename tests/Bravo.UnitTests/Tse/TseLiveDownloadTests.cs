@@ -1,4 +1,4 @@
-using Bravo.Infrastructure.Tse.Downloads;
+using Bravo.Infrastructure.Tse.Clients;
 using Bravo.Infrastructure.Tse.Extraction;
 using Bravo.Infrastructure.Tse.Options;
 using Bravo.Infrastructure.Tse.RateLimiting;
@@ -30,18 +30,20 @@ public sealed class TseLiveDownloadTests : IDisposable
         var options = new TseOptions { TempDirectory = _root };
         var value = Options.Create(options);
 
-        var factory = new Factory();
+        var httpClient = new HttpClient
+        {
+            BaseAddress = new Uri(options.BaseAddress),
+            Timeout = TimeSpan.FromMinutes(5)
+        };
 
-        var downloader = new TseFileDownloader(
-            factory,
+        var client = new TseHttpClient(
+            httpClient,
             new TseRateLimiter(value),
             new TseBackoffPolicy(value),
             value,
-            NullLogger<TseFileDownloader>.Instance);
+            NullLogger<TseHttpClient>.Instance);
 
-        var downloaded = await downloader.DownloadAsync(
-            "estatistica/sead/odsele/consulta_cand/consulta_cand_2022.zip",
-            "consulta_cand_2022.zip");
+        var downloaded = await client.DownloadCandidateArchiveAsync(2022, _root);
 
         downloaded.SizeBytes.Should().BeGreaterThan(1_000_000);
         downloaded.Sha256.Should().HaveLength(64);
@@ -56,14 +58,5 @@ public sealed class TseLiveDownloadTests : IDisposable
 
         files.Should().ContainSingle();
         new FileInfo(files[0].FilePath).Length.Should().BeGreaterThan(10_000);
-    }
-
-    private sealed class Factory : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => new()
-        {
-            BaseAddress = new Uri("https://cdn.tse.jus.br/"),
-            Timeout = TimeSpan.FromMinutes(5)
-        };
     }
 }

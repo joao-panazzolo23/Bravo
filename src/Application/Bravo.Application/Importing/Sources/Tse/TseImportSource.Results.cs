@@ -9,7 +9,6 @@ using Bravo.Domain.Electoral.Models;
 using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Models;
-using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Importing.Sources.Tse;
 
@@ -178,7 +177,8 @@ public sealed partial class TseImportSource
             state,
             keys.SectionCount,
             elapsed.TotalMilliseconds,
-            keys.SectionCount / Math.Max(elapsed.TotalSeconds, 0.001));
+            keys.SectionCount / Math.Max(elapsed.TotalSeconds, 0.001)
+        );
 
         return imported;
     }

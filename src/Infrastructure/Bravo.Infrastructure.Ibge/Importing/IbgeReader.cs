@@ -1,57 +1,31 @@
-using System.Net;
-using System.Text.Json;
-using Bravo.Application.Importing.Exceptions;
-using Bravo.Application.Importing.Sources.Ibge;
+using System.Runtime.CompilerServices;
 using Bravo.Application.Logging;
+using Bravo.Application.Importing.Sources.Ibge;
 using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Geography.Repositories;
+using Bravo.Infrastructure.Ibge.Clients;
 using Bravo.Infrastructure.Ibge.Models;
-using Bravo.Infrastructure.Ibge.RateLimiting;
 using Microsoft.Extensions.Logging;
 
 namespace Bravo.Infrastructure.Ibge.Importing;
 
 /// <summary>
-/// Reads IBGE's reference collections over HTTP as a stream.
+/// Reads IBGE's reference collections and maps them to domain types.
 /// </summary>
 /// <remarks>
-/// This type owns transport only: rate limiting, request lifecycle, status handling and JSON
-/// decoding. Batching, ordering and persistence are orchestrated by the application source, so
-/// the acquisition layer never decides how data is stored.
+/// Transport lives in <see cref="IbgeHttpClient"/>; this type only validates the payload and
+/// decides how each record maps. Batching, ordering and persistence are orchestrated by the
+/// application source, so the acquisition layer never decides how data is stored.
 /// </remarks>
 public sealed class IbgeReader(
-    IHttpClientFactory httpClientFactory,
-    IbgeRateLimiter rateLimiter,
-    ILogger<IbgeReader> logger) : IIbgeReader
+    IbgeHttpClient client,
+    ILogger<IbgeReader> logger
+) : IIbgeReader
 {
-    private const string StatesRequestUri = "api/v1/localidades/estados?orderBy=nome";
-    private const string MunicipalitiesRequestUri = "api/v1/localidades/municipios?orderBy=nome";
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
     public async IAsyncEnumerable<State?> StreamStatesAsync(
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var lease = await rateLimiter.AcquireAsync(cancellationToken);
-
-        if (!lease.IsAcquired)
-            throw new ImportTransientException("The IBGE request rate limit is exhausted.");
-
-        var client = httpClientFactory.CreateClient(IbgeHttpClient.Name);
-        using var response = await client.GetAsync(
-            StatesRequestUri,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
-
-        await EnsureSuccessAsync(response, cancellationToken);
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-
-        await foreach (var item in JsonSerializer.DeserializeAsyncEnumerable<IbgeEstadoDto>(
-                           stream, JsonOptions, cancellationToken))
+        await foreach (var item in client.StreamStatesAsync(cancellationToken))
         {
             if (item is null)
                 continue;
@@ -72,25 +46,9 @@ public sealed class IbgeReader(
     }
 
     public async IAsyncEnumerable<MunicipalityUpsert> StreamMunicipalitiesAsync(
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var lease = await rateLimiter.AcquireAsync(cancellationToken);
-
-        if (!lease.IsAcquired)
-            throw new ImportTransientException("The IBGE request rate limit is exhausted.");
-
-        var client = httpClientFactory.CreateClient(IbgeHttpClient.Name);
-        using var response = await client.GetAsync(
-            MunicipalitiesRequestUri,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
-
-        await EnsureSuccessAsync(response, cancellationToken);
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-
-        await foreach (var item in JsonSerializer.DeserializeAsyncEnumerable<IbgeMunicipalityDto>(
-                           stream, JsonOptions, cancellationToken))
+        await foreach (var item in client.StreamMunicipalitiesAsync(cancellationToken))
         {
             if (item is null)
                 continue;
@@ -107,31 +65,6 @@ public sealed class IbgeReader(
 
             yield return new MunicipalityUpsert(item.Id, item.Nome, stateCode.Value);
         }
-    }
-
-    private static Task EnsureSuccessAsync(
-        HttpResponseMessage response,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (response.StatusCode == HttpStatusCode.TooManyRequests)
-        {
-            throw new ImportTransientException(
-                "IBGE rate limit was reached.",
-                response.Headers.RetryAfter?.Delta);
-        }
-
-        if ((int)response.StatusCode >= 500)
-            throw new ImportTransientException($"IBGE returned {(int)response.StatusCode}.");
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new ImportPermanentException(
-                $"IBGE returned {(int)response.StatusCode} for '{response.RequestMessage?.RequestUri}'.");
-        }
-
-        return Task.CompletedTask;
     }
 
     private static int? GetStateCode(IbgeMunicipalityDto item)

@@ -21,12 +21,8 @@ public class Candidate : Entity
     public Guid? FederationId { get; private set; }
     public Guid? CoalitionId { get; private set; }
     public string? RegistrationStatus { get; private set; }
-    public string? Gender { get; private set; }
     public string? Education { get; private set; }
-    public string? Race { get; private set; }
     public string? Occupation { get; private set; }
-    public DateOnly? BirthDate { get; private set; }
-
     private Candidate() { }
 
     public static Candidate Create(
@@ -43,11 +39,9 @@ public class Candidate : Entity
         Guid? federationId,
         Guid? coalitionId,
         string? registrationStatus,
-        string? gender,
         string? education,
-        string? race,
-        string? occupation,
-        DateOnly? birthDate)
+        string? occupation
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -70,11 +64,8 @@ public class Candidate : Entity
             FederationId = federationId,
             CoalitionId = coalitionId,
             RegistrationStatus = registrationStatus,
-            Gender = gender,
             Education = education,
-            Race = race,
             Occupation = occupation,
-            BirthDate = birthDate
         };
 
         var now = DateTime.UtcNow;

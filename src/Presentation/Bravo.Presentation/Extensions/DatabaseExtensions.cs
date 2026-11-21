@@ -14,7 +14,7 @@ public static class DatabaseExtensions
     {
         return services.AddPostgreSQLDapper()
                        .AddPostgreSQL(configuration)
-                       .AddAcquisition(configuration)
+                       .AddIbge(configuration)
                        .AddTse(configuration);
     }
 

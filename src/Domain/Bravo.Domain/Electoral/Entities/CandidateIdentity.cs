@@ -14,7 +14,11 @@ public class CandidateIdentity : Entity
 
     private CandidateIdentity() { }
 
-    public static CandidateIdentity Create(string? cpf, string fullName, DateOnly? birthDate)
+    public static CandidateIdentity Create(
+        string? cpf,
+        string fullName,
+        DateOnly? birthDate
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
 

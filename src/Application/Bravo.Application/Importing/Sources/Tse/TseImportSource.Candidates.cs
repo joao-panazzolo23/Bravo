@@ -37,7 +37,8 @@ public sealed partial class TseImportSource
             failed,
             processed,
             rejected,
-            "Candidates");
+            "Candidates"
+        );
 
         await Parallel.ForEachAsync(
             years,
@@ -53,7 +54,11 @@ public sealed partial class TseImportSource
                 try
                 {
                     var count = await ImportCandidateYearAsync(
-                        year, context.BatchSize, electionLookup, token);
+                        year,
+                        context.BatchSize,
+                        electionLookup,
+                        token
+                    );
 
                     Interlocked.Add(ref processed, count);
                     Interlocked.Increment(ref completed);
@@ -73,7 +78,8 @@ public sealed partial class TseImportSource
                     Volatile.Read(ref failed),
                     Volatile.Read(ref processed),
                     Volatile.Read(ref rejected),
-                    $"Candidates {year}");
+                    $"Candidates {year}"
+                );
             });
     }
 
@@ -102,7 +108,10 @@ public sealed partial class TseImportSource
 
         foreach (var file in files)
         {
-            using var stateScope = logger.BeginOperationScope(year: year, state: file.StateAcronym);
+            using var stateScope = logger.BeginOperationScope(
+                year: year,
+                state: file.StateAcronym
+            );
 
             var stateId = await ResolveStateIdAsync(file.StateAcronym, stateIds, cancellationToken);
 
@@ -217,7 +226,8 @@ public sealed partial class TseImportSource
         IReadOnlyDictionary<int, Guid> federationIds,
         IReadOnlyDictionary<(Guid, Guid, long), Guid> coalitionIds,
         Guid roundId,
-        IReadOnlyDictionary<string, Guid> identities)
+        Dictionary<string, Guid> identities
+    )
     {
         var officeId = Resolve(officeIds, row.OfficeCode, $"office {row.OfficeCode}");
 
@@ -264,11 +274,9 @@ public sealed partial class TseImportSource
             federationId,
             coalitionId,
             row.RegistrationStatus,
-            row.Gender,
             row.Education,
-            row.Race,
-            row.Occupation,
-            row.BirthDate);
+            row.Occupation
+        );
     }
 
     private async Task<IReadOnlyDictionary<(Guid, Guid, long), Guid>> UpsertCoalitionsAsync(

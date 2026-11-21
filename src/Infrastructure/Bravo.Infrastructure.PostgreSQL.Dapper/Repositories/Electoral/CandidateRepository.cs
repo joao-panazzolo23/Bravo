@@ -90,11 +90,8 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
             "FederationId" uuid,
             "CoalitionId" uuid,
             "RegistrationStatus" varchar(100),
-            "Gender" varchar(150),
             "Education" varchar(150),
-            "Race" varchar(150),
             "Occupation" varchar(150),
-            "BirthDate" date,
             "CreatedAt" timestamp with time zone,
             "UpdatedAt" timestamp with time zone
         ) ON COMMIT DROP;
@@ -103,8 +100,8 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
         COPY staging_candidates
             ("Id", "ElectionId", "OfficeId", "StateId", "CandidateIdentityId",
              "TseCandidateSequential", "BallotNumber", "Name", "UrnName", "SocialName",
-             "PartyId", "FederationId", "CoalitionId", "RegistrationStatus",
-             "Gender", "Education", "Race", "Occupation", "BirthDate", "CreatedAt", "UpdatedAt")
+             "PartyId", "FederationId", "CoalitionId", "RegistrationStatus", "Education",
+             "Occupation", "CreatedAt", "UpdatedAt")
         FROM STDIN (FORMAT BINARY);
         """);
 
@@ -121,20 +118,20 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
         INSERT INTO "Candidates" AS target
             ("Id", "ElectionId", "OfficeId", "StateId", "CandidateIdentityId",
              "TseCandidateSequential", "BallotNumber", "Name", "UrnName", "SocialName",
-             "PartyId", "FederationId", "CoalitionId", "RegistrationStatus",
-             "Gender", "Education", "Race", "Occupation", "BirthDate", "CreatedAt", "UpdatedAt")
+             "PartyId", "FederationId", "CoalitionId", "RegistrationStatus", "Education",
+             "Occupation", "CreatedAt", "UpdatedAt")
         SELECT
             "Id", "ElectionId", "OfficeId", "StateId", "CandidateIdentityId",
             "TseCandidateSequential", "BallotNumber", "Name", "UrnName", "SocialName",
-            "PartyId", "FederationId", "CoalitionId", "RegistrationStatus",
-            "Gender", "Education", "Race", "Occupation", "BirthDate", "CreatedAt", "UpdatedAt"
+            "PartyId", "FederationId", "CoalitionId", "RegistrationStatus", "Education",
+            "Occupation", "CreatedAt", "UpdatedAt"
         FROM (
             SELECT DISTINCT ON ("ElectionId", "StateId", "OfficeId",
                                 "TseCandidateSequential", "BallotNumber", "Name")
                    "Id", "ElectionId", "OfficeId", "StateId", "CandidateIdentityId",
                    "TseCandidateSequential", "BallotNumber", "Name", "UrnName", "SocialName",
-                   "PartyId", "FederationId", "CoalitionId", "RegistrationStatus",
-                   "Gender", "Education", "Race", "Occupation", "BirthDate", "CreatedAt", "UpdatedAt"
+                   "PartyId", "FederationId", "CoalitionId", "RegistrationStatus", "Education",
+                   "Occupation", "CreatedAt", "UpdatedAt"
             FROM staging_candidates
             ORDER BY "ElectionId", "StateId", "OfficeId",
                      "TseCandidateSequential", "BallotNumber", "Name", "ctid" DESC
@@ -150,22 +147,17 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
             "FederationId" = EXCLUDED."FederationId",
             "CoalitionId" = EXCLUDED."CoalitionId",
             "RegistrationStatus" = EXCLUDED."RegistrationStatus",
-            "Gender" = EXCLUDED."Gender",
             "Education" = EXCLUDED."Education",
-            "Race" = EXCLUDED."Race",
             "Occupation" = EXCLUDED."Occupation",
-            "BirthDate" = EXCLUDED."BirthDate",
             "UpdatedAt" = EXCLUDED."UpdatedAt"
         WHERE ROW(
             target."CandidateIdentityId", target."UrnName", target."SocialName",
             target."PartyId", target."FederationId", target."CoalitionId",
-            target."RegistrationStatus", target."Gender", target."Education", target."Race",
-            target."Occupation", target."BirthDate"
+            target."RegistrationStatus", target."Education", target."Occupation"
         ) IS DISTINCT FROM ROW(
             EXCLUDED."CandidateIdentityId", EXCLUDED."UrnName", EXCLUDED."SocialName",
             EXCLUDED."PartyId", EXCLUDED."FederationId", EXCLUDED."CoalitionId",
-            EXCLUDED."RegistrationStatus", EXCLUDED."Gender", EXCLUDED."Education",
-            EXCLUDED."Race", EXCLUDED."Occupation", EXCLUDED."BirthDate"
+            EXCLUDED."RegistrationStatus", EXCLUDED."Education", EXCLUDED."Occupation"
         );
         """;
 
@@ -285,11 +277,8 @@ internal sealed class CandidateRepository(NpgsqlDataSource dataSource) : ICandid
         await importer.WriteNullableAsync(candidate.FederationId, NpgsqlDbType.Uuid, cancellationToken);
         await importer.WriteNullableAsync(candidate.CoalitionId, NpgsqlDbType.Uuid, cancellationToken);
         await importer.WriteNullableAsync(candidate.RegistrationStatus, NpgsqlDbType.Varchar, cancellationToken);
-        await importer.WriteNullableAsync(candidate.Gender, NpgsqlDbType.Varchar, cancellationToken);
         await importer.WriteNullableAsync(candidate.Education, NpgsqlDbType.Varchar, cancellationToken);
-        await importer.WriteNullableAsync(candidate.Race, NpgsqlDbType.Varchar, cancellationToken);
         await importer.WriteNullableAsync(candidate.Occupation, NpgsqlDbType.Varchar, cancellationToken);
-        await importer.WriteNullableAsync(candidate.BirthDate, NpgsqlDbType.Date, cancellationToken);
         await importer.WriteAsync(BulkCopy.AsUtc(candidate.CreatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
         await importer.WriteAsync(BulkCopy.AsUtc(candidate.UpdatedAt), NpgsqlDbType.TimestampTz, cancellationToken);
     }

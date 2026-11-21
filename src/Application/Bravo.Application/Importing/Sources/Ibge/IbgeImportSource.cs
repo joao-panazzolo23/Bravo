@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Importing.Sources.Ibge;
 
+
+///heavily trashed. Probably would make much more sense at infra.
 /// <summary>
 /// Imports IBGE states and then their municipalities.
 /// </summary>

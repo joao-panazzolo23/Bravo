@@ -109,16 +109,29 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
         var repository = Repository<ICandidateRepository>(scope.ServiceProvider);
 
         Candidate Build(string urnName, string? socialName) => Candidate.Create(
-            seed.ElectionId, seed.OfficeId, seed.StateId, null, "SEQ-1", 13, "FULL NAME",
-            urnName, socialName, seed.PartyId, null, null, "DEFERIDO", "FEMININO",
-            "SUPERIOR COMPLETO", "BRANCA", "ADVOGADA", new DateOnly(1985, 6, 7));
+            seed.ElectionId,
+            seed.OfficeId,
+            seed.StateId,
+            null,
+            "SEQ-1",
+            13,
+            "FULL NAME",
+            urnName,
+            socialName,
+            seed.PartyId,
+            null,
+            null,
+            "DEFERIDO",
+            "SUPERIOR COMPLETO",
+            "ADVOGADA"
+        );
 
         await repository.UpsertCandidatesAsync([Build("URNA", null)]);
         await repository.UpsertCandidatesAsync([Build("URNA NOVA", "SOCIAL")]);
 
         await using var command = Db.CreateCommand();
         command.CommandText = """
-            SELECT "UrnName", "SocialName", "BallotNumber", "BirthDate", "TseCandidateSequential"
+            SELECT "UrnName", "SocialName", "BallotNumber", "TseCandidateSequential"
             FROM "Candidates" WHERE "ElectionId" = @election AND "StateId" = @state;
             """;
         command.Parameters.AddWithValue("election", seed.ElectionId);
@@ -130,8 +143,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
         reader.GetString(0).Should().Be("URNA NOVA");
         reader.GetString(1).Should().Be("SOCIAL");
         reader.GetInt32(2).Should().Be(13);
-        reader.GetFieldValue<DateOnly>(3).Should().Be(new DateOnly(1985, 6, 7));
-        reader.GetString(4).Should().Be("SEQ-1");
+        reader.GetString(3).Should().Be("SEQ-1");
 
         reader.Read().Should().BeFalse("the conflict key must stay unique");
     }
@@ -146,14 +158,14 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
 
         var candidate = Candidate.Create(
             seed.ElectionId, seed.OfficeId, seed.StateId, null, "SEQ-NULL", 1, "ONLY REQUIRED",
-            "ONLY REQUIRED", null, null, null, null, null, null, null, null, null, null);
+            "ONLY REQUIRED", null, null, null, null, null, null, null);
 
         await repository.UpsertCandidatesAsync([candidate]);
 
         await using var command = Db.CreateCommand();
         command.CommandText = """
             SELECT "SocialName", "PartyId", "FederationId", "CoalitionId",
-                   "RegistrationStatus", "BirthDate"
+                   "RegistrationStatus"
             FROM "Candidates" WHERE "Id" = @id;
             """;
         command.Parameters.AddWithValue("id", candidate.Id);
@@ -161,7 +173,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
         await using var reader = await command.ExecuteReaderAsync();
         await reader.ReadAsync();
 
-        for (var index = 0; index < 6; index++)
+        for (var index = 0; index < 5; index++)
             reader.IsDBNull(index).Should().BeTrue($"column {index} must stay null");
     }
 
@@ -175,7 +187,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
 
         Candidate Build() => Candidate.Create(
             seed.ElectionId, seed.OfficeId, seed.StateId, null, "SEQ-NOOP", 7, "UNCHANGED",
-            "UNCHANGED", null, seed.PartyId, null, null, "DEFERIDO", null, null, null, null, null);
+            "UNCHANGED", null, seed.PartyId, null, null, "DEFERIDO", null, null);
 
         var candidate = Build();
         await repository.UpsertCandidatesAsync([candidate]);
@@ -204,7 +216,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
 
         Candidate Build(string? socialName) => Candidate.Create(
             seed.ElectionId, seed.OfficeId, seed.StateId, null, "SEQ-CHANGE", 9, "CHANGES",
-            "CHANGES", socialName, seed.PartyId, null, null, "DEFERIDO", null, null, null, null, null);
+            "CHANGES", socialName, seed.PartyId, null, null, "DEFERIDO", null, null);
 
         var candidate = Build(null);
         await repository.UpsertCandidatesAsync([candidate]);
@@ -229,7 +241,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
 
         Candidate Build(string urnName) => Candidate.Create(
             seed.ElectionId, seed.OfficeId, seed.StateId, null, "SEQ-DUP", 3, "DUPLICATE",
-            urnName, null, seed.PartyId, null, null, null, null, null, null, null, null);
+            urnName, null, seed.PartyId, null, null, null, null, null);
 
         // The same conflict key twice used to make PostgreSQL reject the whole statement.
         await repository.UpsertCandidatesAsync([Build("FIRST"), Build("SECOND")]);
@@ -252,11 +264,11 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
 
         var valid = Candidate.Create(
             seed.ElectionId, seed.OfficeId, seed.StateId, null, "SEQ-VALID", 1, "VALID",
-            "VALID", null, null, null, null, null, null, null, null, null, null);
+            "VALID", null, null, null, null, null, null, null);
 
         var invalid = Candidate.Create(
             seed.ElectionId, seed.OfficeId, Guid.CreateVersion7(), null, "SEQ-INVALID", 1, "INVALID",
-            "INVALID", null, null, null, null, null, null, null, null, null, null);
+            "INVALID", null, null, null, null, null, null, null);
 
         var action = async () => await repository.UpsertCandidatesAsync([valid, invalid]);
 
@@ -279,7 +291,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
         var tooLong = Candidate.Create(
             seed.ElectionId, seed.OfficeId, seed.StateId, null, "SEQ-LONG", 1,
             new string('X', 201), new string('X', 201), null, null, null, null,
-            null, null, null, null, null, null);
+            null, null, null);
 
         var action = async () => await repository.UpsertCandidatesAsync([tooLong]);
 
@@ -310,7 +322,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
 
         var candidate = Candidate.Create(
             seed.ElectionId, seed.OfficeId, seed.StateId, null, "SEQ-CANCEL", 1, "CANCELLED",
-            "CANCELLED", null, null, null, null, null, null, null, null, null, null);
+            "CANCELLED", null, null, null, null, null, null, null);
 
         var action = async () => await repository.UpsertCandidatesAsync([candidate], cancellation.Token);
 
@@ -330,7 +342,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
 
         Candidate Build(string sequential) => Candidate.Create(
             seed.ElectionId, seed.OfficeId, seed.StateId, null, sequential, 1, sequential,
-            sequential, null, null, null, null, null, null, null, null, null, null);
+            sequential, null, null, null, null, null, null, null);
 
         await repository.UpsertCandidatesAsync([Build("LEAK-1")]);
         await repository.UpsertCandidatesAsync([Build("LEAK-2")]);

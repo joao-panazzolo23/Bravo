@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\Domain\Bravo.Domain\Bravo.Domain.csproj" />
     <ProjectReference Include="..\..\src\Domain\Bravo.Shared\Bravo.Shared.csproj" />
     <ProjectReference Include="..\..\src\Infrastructure\Bravo.Infrastructure.Tse\Bravo.Infrastructure.Tse.csproj" />
+    <ProjectReference Include="..\..\src\Infrastructure\Bravo.Infrastructure.Ibge\Bravo.Infrastructure.Ibge.csproj" />
   </ItemGroup>
 
   <ItemGroup>

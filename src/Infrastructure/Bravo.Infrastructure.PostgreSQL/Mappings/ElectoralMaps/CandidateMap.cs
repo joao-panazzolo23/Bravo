@@ -15,11 +15,13 @@ internal sealed class CandidateMap : EntityMapper<Candidate>
         builder.Property(x => x.UrnName).HasMaxLength(200).IsRequired();
         builder.Property(x => x.SocialName).HasMaxLength(200);
         builder.Property(x => x.RegistrationStatus).HasMaxLength(100);
-        builder.Property(x => x.Gender).HasMaxLength(150);
+
         builder.Property(x => x.Education).HasMaxLength(150);
-        builder.Property(x => x.Race).HasMaxLength(150);
+
         builder.Property(x => x.Occupation).HasMaxLength(150);
-        builder.Property(x => x.BirthDate);
+
+        // BirthDate, Gender and Race live only on CandidateIdentity: they describe the person, not
+        // the registration, so they must not be duplicated per candidacy.
 
         builder.HasIndex(x => new
         {
@@ -29,8 +31,8 @@ internal sealed class CandidateMap : EntityMapper<Candidate>
             x.TseCandidateSequential,
             x.BallotNumber,
             x.Name
-        })
-            .IsUnique();
+        }).IsUnique();
+
         builder.HasIndex(x => new { x.ElectionId, x.OfficeId, x.StateId });
         builder.HasIndex(x => x.CandidateIdentityId);
 

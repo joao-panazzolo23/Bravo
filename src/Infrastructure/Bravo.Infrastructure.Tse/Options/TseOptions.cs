@@ -2,7 +2,7 @@ namespace Bravo.Infrastructure.Tse.Options;
 
 public sealed class TseOptions
 {
-    public const string SectionName = "Acquisition:Tse";
+    public const string SectionName = "Tse";
 
     public string BaseAddress { get; set; } = "https://cdn.tse.jus.br/";
 
