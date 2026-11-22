@@ -1,8 +1,9 @@
 using System.Data.Common;
 using System.Net.Sockets;
 using Bravo.Application.Imports.Common.Exceptions;
+using Bravo.Application.Imports.Exceptions;
 
-namespace Bravo.Application.Imports.Common.Policies;
+namespace Bravo.Application.Imports.Policies;
 
 /// <summary>
 /// Decides whether a failed import attempt is worth retrying. Transient failures are retried

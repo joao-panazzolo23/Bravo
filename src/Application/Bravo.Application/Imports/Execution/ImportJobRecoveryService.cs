@@ -2,7 +2,7 @@ using Bravo.Application.Logging;
 using Bravo.Domain.Importing.Repositories;
 using Microsoft.Extensions.Logging;
 
-namespace Bravo.Application.Imports.Common.Execution;
+namespace Bravo.Application.Imports.Execution;
 
 /// <summary>
 /// Startup recovery for jobs a previous process left running.

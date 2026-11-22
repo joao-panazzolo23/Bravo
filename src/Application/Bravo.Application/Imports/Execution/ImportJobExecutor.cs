@@ -7,12 +7,12 @@ using Bravo.Domain.Importing.Repositories;
 using Bravo.Domain.Importing.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
-using Bravo.Application.Imports.Common.Options;
 using Bravo.Application.Imports.Common.Policies;
 using Bravo.Application.Imports.Common.Progress;
+using Bravo.Application.Imports.Common.Execution;
+using Bravo.Application.Imports.Policies;
 
-namespace Bravo.Application.Imports.Common.Execution;
+namespace Bravo.Application.Imports.Execution;
 
 /// <summary>
 /// Runs one import job end to end: claim, execute, keep the lease alive, and settle the job row.

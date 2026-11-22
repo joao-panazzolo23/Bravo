@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Bravo.Application.Imports.Common.Commands;
 using Bravo.Application.Imports.Common.Execution;
+using Bravo.Application.Imports.Execution;
 using Bravo.Application.Logging;
 using Mediator;
 using Microsoft.Extensions.Options;
@@ -128,7 +129,7 @@ public sealed class ImportWorker(
             _ = execution.ContinueWith(
                 _ =>
                 {
-                    _active.TryRemove(jobId, out _);
+                    _active.TryRemove(jobId, out _!);
                     _slots.Release();
                 },
                 CancellationToken.None,

@@ -1,13 +1,11 @@
-using Bravo.Application.Imports.Common.Commands;
+
 using Bravo.Application.Imports.Ibge.Commands;
-using Bravo.Application.Imports.Common.Execution;
-using Bravo.Application.Imports.Common.Policies;
-using Bravo.Application.Imports.Common.Progress;
 using Bravo.Application.Imports.Common.ViewModels;
 using Bravo.Shared.Result;
 using Mediator;
+using Bravo.Application.Imports.Execution;
 
-namespace Bravo.Application.Imports.Ibge.Handlers;
+namespace Bravo.Application.Ibge.Handlers;
 
 public sealed class StartIbgeImportHandler(ImportJobStarter starter)
     : ICommandHandler<StartIbgeImportCommand, Result<ImportJobCreatedViewModel>>

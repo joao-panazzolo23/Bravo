@@ -1,4 +1,4 @@
-namespace Bravo.Application.Imports.Common.Exceptions;
+namespace Bravo.Application.Imports.Exceptions;
 
 public sealed class ImportTransientException(
     string message,

@@ -5,7 +5,7 @@ using Bravo.Domain.Importing.Repositories;
 using Bravo.Shared.Result;
 using Microsoft.Extensions.Options;
 
-namespace Bravo.Application.Imports.Common.Execution;
+namespace Bravo.Application.Imports.Execution;
 
 /// <summary>
 /// Persists a new import job and hides the overlap rule from the command handlers.

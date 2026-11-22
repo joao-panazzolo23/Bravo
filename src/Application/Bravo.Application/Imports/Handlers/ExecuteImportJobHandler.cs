@@ -6,8 +6,9 @@ using Bravo.Application.Imports.Common.Policies;
 using Bravo.Application.Imports.Common.Progress;
 using Bravo.Shared.Result;
 using Mediator;
+using Bravo.Application.Imports.Execution;
 
-namespace Bravo.Application.Imports.Common.Commands;
+namespace Bravo.Application.Imports.Handlers;
 
 public sealed class ExecuteImportJobHandler(ImportJobExecutor executor)
     : ICommandHandler<ExecuteImportJobCommand, Result<ImportJobExecutionResult>>
