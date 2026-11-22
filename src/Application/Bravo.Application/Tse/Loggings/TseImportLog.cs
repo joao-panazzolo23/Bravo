@@ -20,5 +20,6 @@ public static partial class TseImportLog
         ILogger logger,
         int year,
         string state,
-        Services.TseResultRejection reason);
+        TseResultRejection reason
+    );
 }

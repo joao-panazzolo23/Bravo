@@ -27,13 +27,37 @@ public sealed class TseStructurePreparer(IElectoralStructureRepository structure
         TseElectionLookup electionLookup,
         CancellationToken cancellationToken)
     {
-        var zoneIds = await EnsureZonesAsync(keys, stateId, municipalityIds, cancellationToken);
-        var sectionIds = await EnsureSectionsAsync(keys, stateId, municipalityIds, zoneIds, cancellationToken);
-        var placeIds = await EnsurePollingPlacesAsync(keys, stateId, municipalityIds, zoneIds, cancellationToken);
+        var zoneIds = await EnsureZonesAsync(
+            keys,
+            stateId,
+            municipalityIds,
+            cancellationToken
+        );
+        var sectionIds = await EnsureSectionsAsync(
+            keys,
+            stateId,
+            municipalityIds,
+            zoneIds,
+            cancellationToken
+        );
+        var placeIds = await EnsurePollingPlacesAsync(
+            keys,
+            stateId,
+            municipalityIds,
+            zoneIds,
+            cancellationToken
+        );
 
         await EnsureAssignmentsAsync(
-            keys, stateId, municipalityIds, zoneIds, sectionIds, placeIds, electionLookup,
-            cancellationToken);
+            keys,
+            stateId,
+            municipalityIds,
+            zoneIds,
+            sectionIds,
+            placeIds,
+            electionLookup,
+            cancellationToken
+        );
 
         return new TseStructureIds(zoneIds, sectionIds, placeIds);
     }
@@ -82,9 +106,11 @@ public sealed class TseStructurePreparer(IElectoralStructureRepository structure
                            && item.ZoneId is not null
                            && !sectionIds.ContainsKey((
                                item.MunicipalityId.Value, item.ZoneId!.Value, item.item.Section)))
+
             // Deduplicate on the resolved key: two different TSE municipality codes can map to
             // the same IBGE municipality, which would otherwise emit the same conflict target
             // twice and make PostgreSQL reject the whole batch.
+
             .GroupBy(item => (item.MunicipalityId!.Value, item.ZoneId!.Value, item.item.Section))
             .Select(group => group.First())
             .Select(item => ElectoralSection.Create(
@@ -121,13 +147,20 @@ public sealed class TseStructurePreparer(IElectoralStructureRepository structure
                            && !placeIds.ContainsKey((stateId, item.ZoneId, item.item.Place)))
             .GroupBy(item => (item.ZoneId!.Value, item.item.Place))
             .Select(group => group.First())
-            .Select(item => PollingPlace.Create(
-                stateId,
-                item.MunicipalityId,
-                item.ZoneId,
-                item.item.Place,
-                $"Local {item.item.Place}",
-                null, null, null, null, null))
+            .Select(item =>
+                PollingPlace.Create(
+                    stateId,
+                    item.MunicipalityId,
+                    item.ZoneId,
+                    item.item.Place,
+                    $"Local {item.item.Place}",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                    )
+            )
             .ToArray();
 
         if (newPlaces.Length == 0)

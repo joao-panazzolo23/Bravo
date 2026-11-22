@@ -2,7 +2,7 @@ using Bravo.Application.Imports.Ibge.Services;
 using Bravo.Domain.Importing.Models;
 using Bravo.Domain.Importing.Services;
 
-namespace Bravo.Application.Imports.Ibge;
+namespace Bravo.Application.Ibge;
 
 /// <summary>
 /// IBGE import facade.
@@ -22,6 +22,7 @@ public sealed class IbgeImportSource(IbgeReferenceImporter importer) : IImportSo
 
     public async Task ExecuteAsync(
         ImportExecutionContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
         => await importer.RunAsync(context, cancellationToken);
 }

@@ -1,5 +1,3 @@
-using Bravo.Application.Imports.Common.Commands;
-using Bravo.Application.Imports.Ibge.Commands;
 using FluentValidation;
 
 namespace Bravo.Application.Imports.Ibge.Commands;

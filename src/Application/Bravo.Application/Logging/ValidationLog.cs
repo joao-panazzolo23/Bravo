@@ -72,17 +72,3 @@ public static partial class ValidationLog
         string reason);
 
 }
-
-///TODO: Remove. Is completelly expected to have multiple CandidateIdentities inside those files
-//     [LoggerMessage(
-//         EventId = 1308,
-//         Level = LogLevel.Warning,
-//         Message = "Candidate identity {CandidateIdentityId} already exists with different canonical " +
-//                   "attributes (full name differs: {FullNameDiffers}, birth date differs: {BirthDateDiffers}). " +
-//                   "The stored identity was preserved and the incoming attributes were not applied.")]
-//     public static partial void CandidateIdentityConflict(
-//         ILogger logger,
-//         Guid candidateIdentityId,
-//         bool fullNameDiffers,
-//         bool birthDateDiffers);
-// }

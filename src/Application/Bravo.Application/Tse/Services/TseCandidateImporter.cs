@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Bravo.Application.Imports.Tse.Services;
 
+///Todo: very large class, maybe refactor later
 /// <summary>
 /// Imports candidate registrations for every configured year.
 /// </summary>
@@ -175,7 +176,8 @@ public sealed class TseCandidateImporter(
         Dictionary<string, Guid> identities,
         TseElectionLookup electionLookup,
         int batchSize,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var imported = 0;
 

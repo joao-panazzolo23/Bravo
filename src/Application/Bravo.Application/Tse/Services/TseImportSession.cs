@@ -23,7 +23,9 @@ namespace Bravo.Application.Imports.Tse.Services;
 ///
 /// Recovery from an abandoned job simply builds a new session; nothing is persisted here.
 /// </remarks>
-public sealed class TseImportSession(ILogger<TseImportSession> logger) : IDisposable, IAsyncDisposable
+public sealed class TseImportSession(
+    ILogger<TseImportSession> logger
+) : IDisposable, IAsyncDisposable
 {
     private readonly Dictionary<int, IReadOnlyList<AcquiredCandidateFile>> _candidatesByYear = [];
     private readonly HashSet<string> _temporaryDirectories = new(StringComparer.Ordinal);

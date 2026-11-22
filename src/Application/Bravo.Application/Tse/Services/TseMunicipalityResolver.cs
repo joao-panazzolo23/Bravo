@@ -15,7 +15,6 @@ namespace Bravo.Application.Imports.Tse.Services;
 /// </remarks>
 public sealed class TseMunicipalityResolver(IGeographyRepository geography)
 {
-    public const decimal ExactConfidence = 1.00m;
     public const decimal NameConfidence = 0.60m;
     public const decimal UnresolvedConfidence = 0.00m;
 
@@ -74,6 +73,7 @@ public sealed class TseMunicipalityResolver(IGeographyRepository geography)
         return results;
     }
 
+    ///todo: idk what to say about this function. reuses, but it is ugly as hell
     private static TseMunicipalityCode Create(
         (string RawCode, string MunicipalityName, Guid StateId) observation,
         int electionYear,
@@ -86,5 +86,6 @@ public sealed class TseMunicipalityResolver(IGeographyRepository geography)
             municipalityId,
             electionYear,
             method,
-            confidence);
+            confidence
+        );
 }

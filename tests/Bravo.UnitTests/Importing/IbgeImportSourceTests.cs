@@ -1,5 +1,5 @@
+using Bravo.Application.Ibge;
 using Bravo.Application.Imports.Common.Exceptions;
-using Bravo.Application.Imports.Ibge;
 using Bravo.Application.Imports.Ibge.Abstractions;
 using Bravo.Application.Imports.Ibge.Models;
 using Bravo.Application.Imports.Ibge.Services;
@@ -7,7 +7,7 @@ using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Geography.Repositories;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Importing.Models;
-using Bravo.UnitTests.Logging;
+// using Bravo.UnitTests.Logging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
