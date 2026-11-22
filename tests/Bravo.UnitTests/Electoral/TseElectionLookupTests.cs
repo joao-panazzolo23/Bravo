@@ -1,4 +1,6 @@
-using Bravo.Application.Importing.Sources.Tse;
+using Bravo.Application.Imports.Tse;
+using Bravo.Application.Imports.Tse.Models;
+using Bravo.Application.Imports.Tse.Services;
 using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Electoral.Repositories;
 using FluentAssertions;

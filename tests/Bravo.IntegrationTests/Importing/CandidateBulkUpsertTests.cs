@@ -22,7 +22,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
 
         var identity = CandidateIdentity.Create("123.456.789-01", "MARIA DA SILVA", new DateOnly(1980, 5, 4));
 
-        var ids = await repository.UpsertIdentitiesAsync([identity]);
+        var ids = (await repository.EnsureIdentitiesAsync([identity])).IdsByKey;
 
         ids.Should().ContainKey(CandidateIdentityKey.Of(identity.Cpf, identity.FullName, identity.BirthDate));
         ids.Values.Single().Should().Be(identity.Id);
@@ -52,8 +52,8 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
         var first = CandidateIdentity.Create(null, "JOSE SEM CPF", null);
         var second = CandidateIdentity.Create(null, "JOSE SEM CPF", null);
 
-        var firstIds = await repository.UpsertIdentitiesAsync([first]);
-        var secondIds = await repository.UpsertIdentitiesAsync([second]);
+        var firstIds = (await repository.EnsureIdentitiesAsync([first])).IdsByKey;
+        var secondIds = (await repository.EnsureIdentitiesAsync([second])).IdsByKey;
 
         firstIds.Values.Single().Should().Be(first.Id);
         secondIds.Values.Single().Should().Be(first.Id, "the conflict must resolve to the stored row");
@@ -71,7 +71,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
         var withCpf = CandidateIdentity.Create("11122233344", "WITH CPF", new DateOnly(1970, 1, 1));
         var withoutCpf = CandidateIdentity.Create(null, "WITHOUT CPF", new DateOnly(1971, 2, 2));
 
-        var ids = await repository.UpsertIdentitiesAsync([withCpf, withoutCpf]);
+        var ids = (await repository.EnsureIdentitiesAsync([withCpf, withoutCpf])).IdsByKey;
 
         ids.Should().HaveCount(2);
         ids[Constants.WithCpfKey].Should().Be(withCpf.Id);
@@ -89,7 +89,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
         var first = CandidateIdentity.Create("55566677788", "DUPLICATED", new DateOnly(1990, 3, 3));
         var second = CandidateIdentity.Create("55566677788", "DUPLICATED", new DateOnly(1990, 3, 3));
 
-        var ids = await repository.UpsertIdentitiesAsync([first, second]);
+        var ids = (await repository.EnsureIdentitiesAsync([first, second])).IdsByKey;
 
         ids.Should().HaveCount(1);
         (await CountAsync("CandidateIdentities", "\"Cpf\" = '55566677788'", new { })).Should().Be(1);
@@ -305,7 +305,7 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
         await using var scope = Pg.Factory.Services.CreateAsyncScope();
         var repository = Repository<ICandidateRepository>(scope.ServiceProvider);
 
-        (await repository.UpsertIdentitiesAsync([])).Should().BeEmpty();
+        (await repository.EnsureIdentitiesAsync([])).IdsByKey.Should().BeEmpty();
         (await repository.UpsertCandidatesAsync([])).Should().Be(0);
     }
 
@@ -364,9 +364,10 @@ public sealed class CandidateBulkUpsertTests(PostgresContainerFixture pg) : Bulk
             .ToArray();
 
         var results = await Task.WhenAll(identities.Select(identity =>
-            repository.UpsertIdentitiesAsync([identity])));
+            repository.EnsureIdentitiesAsync([identity])));
 
-        results.Should().OnlyContain(ids => ids.Values.Single() == results[0].Values.Single());
+        results.Should().OnlyContain(resolution =>
+            resolution.IdsByKey.Values.Single() == results[0].IdsByKey.Values.Single());
         (await CountAsync("CandidateIdentities", "\"Cpf\" = '99988877766'", new { })).Should().Be(1);
     }
 

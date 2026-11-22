@@ -1,8 +1,5 @@
 ﻿namespace Bravo.Application.Exceptions;
 
-public sealed class ValidationException : ApiExceptionBase
+public sealed class ValidationException(List<ApiError> errors) : ApiExceptionBase(errors)
 {
-    public ValidationException(List<ApiError> errors)
-        : base(errors) { }
 }
-

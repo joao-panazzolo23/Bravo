@@ -71,7 +71,7 @@ public sealed class ProgressIntegrationTests(PostgresContainerFixture pg) : Impo
                 jobId,
                 "worker-a",
                 new ImportJobProgress(
-                    ImportStage.Reading,
+                    ImportStage.Candidates,
                     100,
                     value,
                     0,

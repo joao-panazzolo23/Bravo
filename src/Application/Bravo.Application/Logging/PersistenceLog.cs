@@ -33,16 +33,6 @@ public static partial class PersistenceLog
         Exception exception);
 
     [LoggerMessage(
-        EventId = 1404,
-        Level = LogLevel.Debug,
-        Message = "Checkpoint persisted for job {JobId}, work unit {WorkUnitId}. Position: {Position}.")]
-    public static partial void CheckpointPersisted(
-        ILogger logger,
-        Guid jobId,
-        Guid workUnitId,
-        string position);
-
-    [LoggerMessage(
         EventId = 1405,
         Level = LogLevel.Warning,
         Message = "Could not persist progress for import job {JobId}.")]

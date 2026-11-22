@@ -50,13 +50,11 @@ public sealed class ValidationAndPersistenceLogTests
     public void PersistenceEventsEmitExpectedProperties()
     {
         var jobId = Guid.NewGuid();
-        var unitId = Guid.NewGuid();
         var dbEx = new InvalidOperationException("PostgreSQL deadlocked");
 
         PersistenceLog.BatchPersisting(_logger, "Candidate", 1000);
         PersistenceLog.BatchPersisted(_logger, "Candidate", 1000, 45.2);
         PersistenceLog.PersistenceFailed(_logger, "Candidate", dbEx);
-        PersistenceLog.CheckpointPersisted(_logger, jobId, unitId, "pos-500");
         PersistenceLog.ProgressPersistFailed(_logger, jobId, dbEx);
         PersistenceLog.IntegrityViolation(_logger, "Candidate", "FK constraint violation", dbEx);
         PersistenceLog.TransactionFailed(_logger, "Candidate", dbEx);
@@ -67,7 +65,7 @@ public sealed class ValidationAndPersistenceLogTests
         PersistenceLog.IbgeImportCompleted(_logger, 27, 5570);
 
         var entries = _logger.Entries.OrderBy(x => x.EventId.Id).ToArray();
-        entries.Should().HaveCount(12);
+        entries.Should().HaveCount(11);
 
         entries[0].EventId.Id.Should().Be(1401);
         entries[0].Properties["EntityName"].Should().Be("Candidate");
@@ -79,32 +77,29 @@ public sealed class ValidationAndPersistenceLogTests
         entries[2].EventId.Id.Should().Be(1403);
         entries[2].Exception.Should().BeSameAs(dbEx);
 
-        entries[3].EventId.Id.Should().Be(1404);
-        entries[3].Properties["Position"].Should().Be("pos-500");
+        entries[3].EventId.Id.Should().Be(1405);
+        entries[3].Exception.Should().BeSameAs(dbEx);
 
-        entries[4].EventId.Id.Should().Be(1405);
+        entries[4].EventId.Id.Should().Be(1406);
         entries[4].Exception.Should().BeSameAs(dbEx);
 
-        entries[5].EventId.Id.Should().Be(1406);
+        entries[5].EventId.Id.Should().Be(1407);
         entries[5].Exception.Should().BeSameAs(dbEx);
 
-        entries[6].EventId.Id.Should().Be(1407);
-        entries[6].Exception.Should().BeSameAs(dbEx);
+        entries[6].EventId.Id.Should().Be(1408);
+        entries[6].Properties["Elections"].Should().Be(2);
 
-        entries[7].EventId.Id.Should().Be(1408);
-        entries[7].Properties["Elections"].Should().Be(2);
+        entries[7].EventId.Id.Should().Be(1409);
+        entries[7].Properties["States"].Should().Be(27);
 
-        entries[8].EventId.Id.Should().Be(1409);
-        entries[8].Properties["States"].Should().Be(27);
+        entries[8].EventId.Id.Should().Be(1410);
+        entries[8].Properties["State"].Should().Be("AC");
 
-        entries[9].EventId.Id.Should().Be(1410);
-        entries[9].Properties["State"].Should().Be("AC");
+        entries[9].EventId.Id.Should().Be(1411);
+        entries[9].Properties["Count"].Should().Be(542);
 
-        entries[10].EventId.Id.Should().Be(1411);
-        entries[10].Properties["Count"].Should().Be(542);
-
-        entries[11].EventId.Id.Should().Be(1412);
-        entries[11].Properties["States"].Should().Be(27);
-        entries[11].Properties["Municipalities"].Should().Be(5570);
+        entries[10].EventId.Id.Should().Be(1412);
+        entries[10].Properties["States"].Should().Be(27);
+        entries[10].Properties["Municipalities"].Should().Be(5570);
     }
 }

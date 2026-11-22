@@ -120,7 +120,7 @@ public sealed class JobLifecycleIntegrationTests(PostgresContainerFixture pg) : 
     [Fact]
     public async Task FailedJobCanBeRequeuedAndExecutedAgain()
     {
-        Source.Failure = _ => new Bravo.Application.Importing.Exceptions.ImportPermanentException("Permanent source failure.");
+        Source.Failure = _ => new Bravo.Application.Imports.Common.Exceptions.ImportPermanentException("Permanent source failure.");
 
         var jobId = await CreateJobAsync();
 

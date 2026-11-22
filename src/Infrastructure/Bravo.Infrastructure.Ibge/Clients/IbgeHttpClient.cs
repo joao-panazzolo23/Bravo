@@ -1,7 +1,7 @@
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Bravo.Application.Importing.Exceptions;
+using Bravo.Application.Imports.Common.Exceptions;
 using Bravo.Infrastructure.Ibge.Models;
 using Bravo.Infrastructure.Ibge.RateLimiting;
 

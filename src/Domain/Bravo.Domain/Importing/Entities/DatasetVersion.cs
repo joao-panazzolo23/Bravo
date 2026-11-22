@@ -15,7 +15,21 @@ public class DatasetVersion : Entity
 
     private DatasetVersion() { }
 
-    public static DatasetVersion Create(Guid importDatasetId, string scope, Guid? importJobId)
+    /// <summary>
+    /// Creates a version.
+    /// </summary>
+    /// <param name="status">
+    /// The status the row is inserted with. A caller that immediately starts importing should
+    /// pass <see cref="DatasetVersionStatus.Importing"/>, because writing a row as
+    /// <see cref="DatasetVersionStatus.Pending"/> only to update it in the next statement is a
+    /// second write with no observable intermediate state. The default keeps <c>Pending</c> for
+    /// callers that genuinely register a version before starting work.
+    /// </param>
+    public static DatasetVersion Create(
+        Guid importDatasetId,
+        string scope,
+        Guid? importJobId,
+        DatasetVersionStatus status = DatasetVersionStatus.Pending)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scope);
 
@@ -24,7 +38,7 @@ public class DatasetVersion : Entity
         {
             ImportDatasetId = importDatasetId,
             Scope = scope,
-            Status = DatasetVersionStatus.Pending,
+            Status = status,
             ImportJobId = importJobId
         };
 

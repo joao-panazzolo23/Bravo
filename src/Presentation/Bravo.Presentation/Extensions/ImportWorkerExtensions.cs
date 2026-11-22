@@ -1,4 +1,4 @@
-using Bravo.Application.Importing.Options;
+using Bravo.Application.Imports.Common.Options;
 using Bravo.Presentation.Workers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

@@ -30,13 +30,11 @@ public sealed class LoggingScopeTests
     }
 
     [Fact]
-    public void WorkUnitScopeCapturesUnitContext()
+    public void OperationScopeCapturesOperationContext()
     {
-        var unitId = Guid.NewGuid();
-
-        using (_logger.BeginWorkUnitScope(unitId, year: 2022, state: "AC", correlationId: "unit-corr"))
+        using (_logger.BeginOperationScope(year: 2022, state: "AC", correlationId: "op-corr"))
         {
-            ImportLog.WorkUnitStarted(_logger, unitId, "cand:2022:AC");
+            ProcessingLog.DownloadStarted(_logger, "https://tse.jus.br/file.zip");
         }
 
         var entry = _logger.Entries.Should().ContainSingle().Subject;
@@ -45,21 +43,19 @@ public sealed class LoggingScopeTests
         var scope = entry.Scopes[0].Should().BeAssignableTo<IReadOnlyList<KeyValuePair<string, object?>>>().Subject;
         var dictionary = scope.ToDictionary(x => x.Key, x => x.Value);
 
-        dictionary["WorkUnitId"].Should().Be(unitId);
         dictionary["Year"].Should().Be(2022);
         dictionary["State"].Should().Be("AC");
-        dictionary["CorrelationId"].Should().Be("unit-corr");
+        dictionary["CorrelationId"].Should().Be("op-corr");
     }
 
     [Fact]
     public void NestedScopesPropagateAllContextLevels()
     {
         var jobId = Guid.NewGuid();
-        var unitId = Guid.NewGuid();
 
         using (_logger.BeginJobScope(jobId, "TSE", "worker-1"))
         {
-            using (_logger.BeginWorkUnitScope(unitId, year: 2022, state: "SP"))
+            using (_logger.BeginOperationScope(year: 2022, state: "SP"))
             {
                 using (_logger.BeginOperationScope(year: 2022, state: "SP", correlationId: "op-1"))
                 {

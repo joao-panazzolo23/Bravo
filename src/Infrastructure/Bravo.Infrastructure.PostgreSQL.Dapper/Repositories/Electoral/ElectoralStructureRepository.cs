@@ -74,11 +74,11 @@ internal sealed class ElectoralStructureRepository(NpgsqlDataSource dataSource)
         FROM STDIN (FORMAT BINARY);
         """);
 
-    // A section has no mutable business column: the original DO UPDATE only refreshed UpdatedAt.
-    // That refresh is deliberately preserved rather than replaced by DO NOTHING, because it is
-    // the one observable effect the statement ever had, and dropping it would silently change
-    // data. The cost is negligible in practice: the caller filters out sections that already
-    // exist, so the conflict branch is only reached by genuinely repeated input.
+    // A section has no mutable business column, so the previous DO UPDATE only refreshed
+    // UpdatedAt. Nothing in the application reads that timestamp as a heartbeat: sections are
+    // resolved by their natural key and the caller already filters out the ones that exist. A
+    // re-import therefore has no observable state change to make, and DO NOTHING avoids a row
+    // version, WAL and index maintenance for every section of every repeated scope.
     private const string MergeSectionsSql = """
         INSERT INTO "ElectoralSections"
             ("Id", "MunicipalityId", "ZoneId", "TseSectionNumber", "CreatedAt", "UpdatedAt")
@@ -90,8 +90,7 @@ internal sealed class ElectoralStructureRepository(NpgsqlDataSource dataSource)
             ORDER BY "MunicipalityId", "ZoneId", "TseSectionNumber", "ctid" DESC
         ) AS staged
         ORDER BY "MunicipalityId", "ZoneId", "TseSectionNumber"
-        ON CONFLICT ("MunicipalityId", "ZoneId", "TseSectionNumber") DO UPDATE SET
-            "UpdatedAt" = EXCLUDED."UpdatedAt";
+        ON CONFLICT ("MunicipalityId", "ZoneId", "TseSectionNumber") DO NOTHING;
         """;
 
     private static readonly BulkStagingTable PollingPlacesStaging = new(

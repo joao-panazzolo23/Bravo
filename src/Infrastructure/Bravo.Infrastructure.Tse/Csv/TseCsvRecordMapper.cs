@@ -29,10 +29,6 @@ internal sealed class TseCsvRecordMapper
         _missingColumns = missingColumns;
     }
 
-    // public TseLayout Layout => _layout;
-
-    // public IReadOnlyList<string> MissingColumns => _missingColumns;
-
     public static TseCsvRecordMapper Create(
         TseLayout layout,
         IReadOnlyList<string> header)

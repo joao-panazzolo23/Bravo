@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text;
-using Bravo.Application.Importing.Exceptions;
+using Bravo.Application.Imports.Common.Exceptions;
 using Bravo.Infrastructure.Ibge.Clients;
 using Bravo.Infrastructure.Ibge.Options;
 using Bravo.Infrastructure.Ibge.RateLimiting;

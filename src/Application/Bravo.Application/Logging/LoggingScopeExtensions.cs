@@ -14,16 +14,6 @@ public static class LoggingScopeExtensions
         return logger.BeginScope(new JobScope(jobId, source, workerId, correlationId));
     }
 
-    public static IDisposable? BeginWorkUnitScope(
-        this ILogger logger,
-        Guid workUnitId,
-        int? year = null,
-        string? state = null,
-        string? correlationId = null)
-    {
-        return logger.BeginScope(new WorkUnitScope(workUnitId, year, state, correlationId));
-    }
-
     public static IDisposable? BeginOperationScope(
         this ILogger logger,
         int? year = null,

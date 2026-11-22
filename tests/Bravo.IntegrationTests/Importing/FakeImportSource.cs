@@ -55,7 +55,7 @@ public sealed class FakeImportSource : IImportSource
 
         _runs.Enqueue(run);
 
-        context.Report(ImportStage.Reading, Operations, 0, 0, 0, 0, "Starting");
+        context.Report(ImportStage.Candidates, Operations, 0, 0, 0, 0, "Starting");
 
         var failure = Failure?.Invoke(attempt);
 

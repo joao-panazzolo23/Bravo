@@ -1,28 +1,23 @@
 using System.Runtime.CompilerServices;
-using Bravo.Application.Logging;
-using Bravo.Application.Importing.Sources.Ibge;
-using Bravo.Domain.Geography.Entities;
-using Bravo.Domain.Geography.Repositories;
+using Bravo.Application.Imports.Ibge.Abstractions;
+using Bravo.Application.Imports.Ibge.Models;
 using Bravo.Infrastructure.Ibge.Clients;
 using Bravo.Infrastructure.Ibge.Models;
-using Microsoft.Extensions.Logging;
 
 namespace Bravo.Infrastructure.Ibge.Importing;
 
 /// <summary>
-/// Reads IBGE's reference collections and maps them to domain types.
+/// Reads IBGE's reference collections and projects them onto the application's import records.
 /// </summary>
 /// <remarks>
-/// Transport lives in <see cref="IbgeHttpClient"/>; this type only validates the payload and
-/// decides how each record maps. Batching, ordering and persistence are orchestrated by the
-/// application source, so the acquisition layer never decides how data is stored.
+/// Transport lives in <see cref="IbgeHttpClient"/>; this type only maps the wire DTO onto the
+/// application record. It deliberately does not decide whether a record is valid or build domain
+/// entities: an absent abbreviation or region is preserved as a null so the application can reject
+/// it with a diagnostic, which is the same policy the TSE import applies.
 /// </remarks>
-public sealed class IbgeReader(
-    IbgeHttpClient client,
-    ILogger<IbgeReader> logger
-) : IIbgeReader
+public sealed class IbgeReader(IbgeHttpClient client) : IIbgeReader
 {
-    public async IAsyncEnumerable<State?> StreamStatesAsync(
+    public async IAsyncEnumerable<IbgeStateRecord> StreamStatesAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (var item in client.StreamStatesAsync(cancellationToken))
@@ -30,22 +25,15 @@ public sealed class IbgeReader(
             if (item is null)
                 continue;
 
+            // IBGE exposes the region acronym under either name depending on the endpoint; the
+            // reader keeps both candidates and lets the application decide what is usable.
             var region = item.Region?.Sail ?? item.Region?.Name;
 
-            if (string.IsNullOrWhiteSpace(item.Sail) || string.IsNullOrWhiteSpace(region))
-            {
-                ValidationLog.IbgeRecordDiscarded(
-                    logger, "state", item.Id, "required fields are missing");
-
-                yield return null;
-                continue;
-            }
-
-            yield return State.Create(item.Id, item.Sail, item.Name, region);
+            yield return new IbgeStateRecord(item.Id, item.Sail, item.Name, region);
         }
     }
 
-    public async IAsyncEnumerable<MunicipalityUpsert> StreamMunicipalitiesAsync(
+    public async IAsyncEnumerable<IbgeMunicipalityRecord> StreamMunicipalitiesAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (var item in client.StreamMunicipalitiesAsync(cancellationToken))
@@ -53,20 +41,15 @@ public sealed class IbgeReader(
             if (item is null)
                 continue;
 
-            var stateCode = GetStateCode(item);
-
-            if (stateCode is null)
-            {
-                ValidationLog.IbgeRecordDiscarded(
-                    logger, "municipality", item.Id, "state could not be resolved");
-
-                continue;
-            }
-
-            yield return new MunicipalityUpsert(item.Id, item.Nome, stateCode.Value);
+            yield return new IbgeMunicipalityRecord(item.Id, item.Nome, GetStateCode(item));
         }
     }
 
+    /// <summary>
+    /// Resolves the federative unit id from either region tree. This is wire-format knowledge: the
+    /// municipality DTO nests its state under a different path depending on which IBGE endpoint
+    /// produced the payload.
+    /// </summary>
     private static int? GetStateCode(IbgeMunicipalityDto item)
         => item.MicroRegion?.MesoRegion?.FederativeUnit?.Id
            ?? item.ImmediateRegion?.IntermediateRegion?.FederativeUnit?.Id;

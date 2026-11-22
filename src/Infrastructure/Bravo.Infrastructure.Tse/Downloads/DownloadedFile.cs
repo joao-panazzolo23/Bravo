@@ -5,4 +5,5 @@ public sealed record DownloadedFile(
     string FileName,
     long SizeBytes,
     string Sha256,
-    string SourceUrl);
+    string SourceUrl
+);

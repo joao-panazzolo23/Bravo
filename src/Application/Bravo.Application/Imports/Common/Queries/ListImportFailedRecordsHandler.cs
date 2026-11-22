@@ -1,0 +1,40 @@
+using Bravo.Application.Imports.Common.Queries;
+using Bravo.Application.Imports.Common.ViewModels;
+using Bravo.Shared.Result;
+using Mediator;
+using Bravo.Domain.Importing.Repositories;
+
+namespace Bravo.Application.Imports.Common.Queries;
+
+public sealed class ListImportFailedRecordsHandler(
+    IImportJobRepository jobs,
+    IImportFailedRecordRepository failedRecords)
+    : IQueryHandler<ListImportFailedRecordsQuery, Result<IReadOnlyList<ImportFailedRecordViewModel>>>
+{
+    public async ValueTask<Result<IReadOnlyList<ImportFailedRecordViewModel>>> Handle(
+        ListImportFailedRecordsQuery query,
+        CancellationToken cancellationToken)
+    {
+        var job = await jobs.GetAsync(query.JobId, cancellationToken);
+
+        if (job is null)
+            return Result<IReadOnlyList<ImportFailedRecordViewModel>>.NotFound(
+                message: "Import job not found."
+            );
+
+        var records = await failedRecords.ListByJobAsync(query.JobId, query.Limit, cancellationToken);
+
+        var list = records.Select(record => new ImportFailedRecordViewModel(
+            record.Id,
+            record.SourceIdentifier,
+            record.Payload,
+            record.ErrorCategory.ToString(),
+            record.ErrorDescription,
+            record.AttemptCount,
+            record.CreatedAt)).ToArray();
+
+        return Result<IReadOnlyList<ImportFailedRecordViewModel>>.OK(
+            list
+        );
+    }
+}

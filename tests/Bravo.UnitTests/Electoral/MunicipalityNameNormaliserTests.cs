@@ -1,4 +1,4 @@
-using Bravo.Application.Electoral.Services;
+using Bravo.Application.Imports.Tse.Services;
 using FluentAssertions;
 
 namespace Bravo.UnitTests.Electoral;

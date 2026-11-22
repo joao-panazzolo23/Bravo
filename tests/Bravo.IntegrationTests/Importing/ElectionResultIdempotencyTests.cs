@@ -200,8 +200,8 @@ public sealed class ElectionResultIdempotencyTests(PostgresContainerFixture pg) 
         static CandidateIdentity Build() =>
             CandidateIdentity.Create(null, "NO CPF NO BIRTH DATE", null);
 
-        await repository.UpsertIdentitiesAsync([Build()]);
-        await repository.UpsertIdentitiesAsync([Build()]);
+        await repository.EnsureIdentitiesAsync([Build()]);
+        await repository.EnsureIdentitiesAsync([Build()]);
 
         await using var command = Db.CreateCommand();
         command.CommandText = """

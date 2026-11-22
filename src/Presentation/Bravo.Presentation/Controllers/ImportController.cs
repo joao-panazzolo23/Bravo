@@ -1,7 +1,8 @@
-using Bravo.Application.Importing.Commands;
-using Bravo.Application.Importing.Queries;
-using Bravo.Application.Importing.ViewModels;
-using Bravo.Presentation.Authorization;
+using Bravo.Application.Imports.Common.Commands;
+using Bravo.Application.Imports.Ibge.Commands;
+using Bravo.Application.Imports.Tse.Commands;
+using Bravo.Application.Imports.Common.Queries;
+using Bravo.Application.Imports.Common.ViewModels;
 using Bravo.Shared.Result;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;

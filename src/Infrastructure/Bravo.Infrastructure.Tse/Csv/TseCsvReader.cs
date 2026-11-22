@@ -10,7 +10,11 @@ namespace Bravo.Infrastructure.Tse.Csv;
 /// line breaks. Records are yielded lazily so arbitrarily large files are never
 /// materialised in memory.
 /// </remarks>
-public sealed class TseCsvReader(TextReader reader, char delimiter, char quote) : IDisposable
+public sealed class TseCsvReader(
+    TextReader reader,
+    char delimiter,
+    char quote
+) : IDisposable
 {
     private readonly TextReader _reader = reader ?? throw new ArgumentNullException(nameof(reader));
 

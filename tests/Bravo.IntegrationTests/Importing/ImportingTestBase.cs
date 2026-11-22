@@ -1,5 +1,7 @@
-using Bravo.Application.Importing.Commands;
-using Bravo.Application.Importing.ViewModels;
+using Bravo.Application.Imports.Common.Commands;
+using Bravo.Application.Imports.Ibge.Commands;
+using Bravo.Application.Imports.Tse.Commands;
+using Bravo.Application.Imports.Common.ViewModels;
 using Bravo.Domain.Importing.Entities;
 using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Importing.Repositories;

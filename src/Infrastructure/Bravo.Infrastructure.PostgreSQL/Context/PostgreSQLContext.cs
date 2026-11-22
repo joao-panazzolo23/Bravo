@@ -35,7 +35,6 @@ public class PostgreSQLContext(DbContextOptions<PostgreSQLContext> options) : Db
     public DbSet<CandidateIdentity> CandidateIdentities { get; set; }
     public DbSet<Candidate> Candidates { get; set; }
     public DbSet<ElectionResult> ElectionResults { get; set; }
-    public DbSet<ElectionStatistics> ElectionStatistics { get; set; }
     public DbSet<State> States { get; set; }
     public DbSet<Municipality> Municipalities { get; set; }
 

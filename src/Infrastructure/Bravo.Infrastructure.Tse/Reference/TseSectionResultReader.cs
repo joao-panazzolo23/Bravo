@@ -23,8 +23,6 @@ namespace Bravo.Infrastructure.Tse.Reference;
 /// </remarks>
 public sealed class TseSectionResultReader : ITseSectionResultReader
 {
-    public const int BlankVoteCode = 95;
-    public const int NullVoteCode = 96;
 
     public async IAsyncEnumerable<TseSectionResultRow> ReadAsync(
         Stream stream,

@@ -1,5 +1,8 @@
-using Bravo.Application.Importing.Exceptions;
-using Bravo.Application.Importing.Sources.Ibge;
+using Bravo.Application.Imports.Common.Exceptions;
+using Bravo.Application.Imports.Ibge;
+using Bravo.Application.Imports.Ibge.Abstractions;
+using Bravo.Application.Imports.Ibge.Models;
+using Bravo.Application.Imports.Ibge.Services;
 using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Geography.Repositories;
 using Bravo.Domain.Importing.Enums;
@@ -25,10 +28,10 @@ public sealed class IbgeImportSourceTests
     }
 
     private sealed class FakeReader(
-        IReadOnlyList<State?> states,
-        IReadOnlyList<MunicipalityUpsert> municipalities) : IIbgeReader
+        IReadOnlyList<IbgeStateRecord> states,
+        IReadOnlyList<IbgeMunicipalityRecord> municipalities) : IIbgeReader
     {
-        public async IAsyncEnumerable<State?> StreamStatesAsync(
+        public async IAsyncEnumerable<IbgeStateRecord> StreamStatesAsync(
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
         {
             foreach (var state in states)
@@ -39,7 +42,7 @@ public sealed class IbgeImportSourceTests
             }
         }
 
-        public async IAsyncEnumerable<MunicipalityUpsert> StreamMunicipalitiesAsync(
+        public async IAsyncEnumerable<IbgeMunicipalityRecord> StreamMunicipalitiesAsync(
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
         {
             foreach (var municipality in municipalities)
@@ -94,7 +97,15 @@ public sealed class IbgeImportSourceTests
     private static ImportExecutionContext Context(int batchSize, RecordingProgress progress)
         => new(Guid.CreateVersion7(), batchSize, 1, progress);
 
-    private static State SampleState(int code = 11) => State.Create(code, $"S{code}", $"STATE {code}", "NORTE");
+    /// <summary>
+    /// Builds the facade around the importer, which is the unit that owns the orchestration.
+    /// </summary>
+    private static IbgeImportSource CreateSource(IIbgeReader reader, RecordingGeography geography)
+        => new(new IbgeReferenceImporter(
+            reader, geography, NullLogger<IbgeReferenceImporter>.Instance));
+
+    private static IbgeStateRecord SampleState(int code = 11)
+        => new(code, $"S{code}", $"STATE {code}", "NORTE");
 
     [Fact]
     public async Task StatesAreWrittenBeforeMunicipalitiesAndInBatches()
@@ -102,9 +113,9 @@ public sealed class IbgeImportSourceTests
         var geography = new RecordingGeography();
         var reader = new FakeReader(
             [SampleState(), SampleState(12), SampleState(13)],
-            [new MunicipalityUpsert(1, "A", 11), new MunicipalityUpsert(2, "B", 11)]);
+            [new IbgeMunicipalityRecord(1, "A", 11), new IbgeMunicipalityRecord(2, "B", 11)]);
 
-        var source = new IbgeImportSource(reader, geography, NullLogger<IbgeImportSource>.Instance);
+        var source = CreateSource(reader, geography);
         var progress = new RecordingProgress();
 
         await source.ExecuteAsync(Context(batchSize: 2, progress), CancellationToken.None);
@@ -120,12 +131,12 @@ public sealed class IbgeImportSourceTests
     }
 
     [Fact]
-    public async Task NullStatesAreSkippedButStillCountAsObserved()
+    public async Task UnusableStatesAreRejectedButStillCountAsObserved()
     {
         var geography = new RecordingGeography();
-        var reader = new FakeReader([null, SampleState()], []);
+        var reader = new FakeReader([new IbgeStateRecord(-1, null, "INVALID", null), SampleState()], []);
 
-        var source = new IbgeImportSource(reader, geography, NullLogger<IbgeImportSource>.Instance);
+        var source = CreateSource(reader, geography);
 
         await source.ExecuteAsync(Context(10, new RecordingProgress()), CancellationToken.None);
 
@@ -139,7 +150,7 @@ public sealed class IbgeImportSourceTests
         var geography = new RecordingGeography();
         var reader = new FakeReader([], []);
 
-        var source = new IbgeImportSource(reader, geography, NullLogger<IbgeImportSource>.Instance);
+        var source = CreateSource(reader, geography);
 
         var action = async () => await source.ExecuteAsync(
             Context(10, new RecordingProgress()), CancellationToken.None);
@@ -158,9 +169,9 @@ public sealed class IbgeImportSourceTests
 
         var reader = new FakeReader(
             [SampleState()],
-            [new MunicipalityUpsert(1, "A", 11), new MunicipalityUpsert(2, "B", 11)]);
+            [new IbgeMunicipalityRecord(1, "A", 11), new IbgeMunicipalityRecord(2, "B", 11)]);
 
-        var source = new IbgeImportSource(reader, geography, NullLogger<IbgeImportSource>.Instance);
+        var source = CreateSource(reader, geography);
 
         var action = async () => await source.ExecuteAsync(
             Context(10, new RecordingProgress()), CancellationToken.None);
@@ -172,10 +183,7 @@ public sealed class IbgeImportSourceTests
     [Fact]
     public void TheSourceKeepsItsRegistrationKey()
     {
-        var source = new IbgeImportSource(
-            new FakeReader([], []),
-            new RecordingGeography(),
-            NullLogger<IbgeImportSource>.Instance);
+        var source = CreateSource(new FakeReader([], []), new RecordingGeography());
 
         source.Key.Should().Be("IBGE");
     }
@@ -185,7 +193,7 @@ public sealed class IbgeImportSourceTests
     {
         var geography = new RecordingGeography();
         var reader = new FakeReader([SampleState()], []);
-        var source = new IbgeImportSource(reader, geography, NullLogger<IbgeImportSource>.Instance);
+        var source = CreateSource(reader, geography);
 
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();

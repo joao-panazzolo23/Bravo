@@ -33,20 +33,25 @@ public sealed class TseReferenceReader : ITseReferenceReader
                 values[Canonical.ElectionTypeName],
                 values[Canonical.ElectionDescription],
                 TseValues.ParseNullableDate(values[Canonical.ElectionDate]),
-                (short)TseValues.ParseInt(values[Canonical.Round]));
+                (short)TseValues.ParseInt(values[Canonical.Round])
+            );
 
             elections[(election.Code, election.Round)] = election;
 
             var office = new TseOfficeReference(
-                TseValues.ParseInt(values[Canonical.OfficeCode]),
-                values[Canonical.OfficeName]);
+                TseValues.ParseInt(
+                    values[Canonical.OfficeCode]),
+                    values[Canonical.OfficeName]
+            );
 
             offices[office.Code] = office;
 
             var party = new TsePartyReference(
-                TseValues.ParseInt(values[Canonical.PartyNumber]),
-                values[Canonical.PartyAcronym],
-                values[Canonical.PartyName]);
+                TseValues.ParseInt(
+                    values[Canonical.PartyNumber]),
+                    values[Canonical.PartyAcronym],
+                    values[Canonical.PartyName]
+            );
 
             parties[(party.Number, party.Acronym)] = party;
 
@@ -61,15 +66,17 @@ public sealed class TseReferenceReader : ITseReferenceReader
                         number,
                         values[Canonical.FederationName],
                         values[Canonical.FederationAcronym],
-                        TseValues.Optional(values.GetValueOrDefault(Canonical.FederationComposition)));
+                        TseValues.Optional(values.GetValueOrDefault(Canonical.FederationComposition))
+                    );
                 }
             }
         }
 
         return new TseReferenceSnapshot(
-            elections.Values.OrderBy(e => e.Code).ThenBy(e => e.Round).ToArray(),
-            offices.Values.OrderBy(office => office.Code).ToArray(),
-            parties.Values.OrderBy(party => party.Number).ThenBy(party => party.Acronym).ToArray(),
-            federations.Values.OrderBy(federation => federation.Number).ToArray());
+            [.. elections.Values.OrderBy(e => e.Code).ThenBy(e => e.Round)],
+            [.. offices.Values.OrderBy(office => office.Code)],
+            [.. parties.Values.OrderBy(party => party.Number).ThenBy(party => party.Acronym)],
+            [.. federations.Values.OrderBy(federation => federation.Number)]
+        );
     }
 }

@@ -1,4 +1,6 @@
-using Bravo.Application.Importing.Services;
+using Bravo.Application.Imports.Common.Execution;
+using Bravo.Application.Imports.Common.Policies;
+using Bravo.Application.Imports.Common.Progress;
 using Bravo.Domain.Importing.Enums;
 using Bravo.IntegrationTests.Configurations;
 using FluentAssertions;
@@ -56,7 +58,7 @@ public sealed class ImportJobExecutorTests(PostgresContainerFixture pg) : Import
     [Fact]
     public async Task FailedJobIsScheduledForRetryWhenTransient()
     {
-        Source.Failure = _ => new Bravo.Application.Importing.Exceptions.ImportTransientException(
+        Source.Failure = _ => new Bravo.Application.Imports.Common.Exceptions.ImportTransientException(
             "temporary failure", TimeSpan.FromMilliseconds(10));
 
         var jobId = await CreateJobAsync(maxAttempts: 3);
@@ -80,7 +82,7 @@ public sealed class ImportJobExecutorTests(PostgresContainerFixture pg) : Import
     [Fact]
     public async Task PermanentFailureIsNotScheduledForRetry()
     {
-        Source.Failure = _ => new Bravo.Application.Importing.Exceptions.ImportPermanentException(
+        Source.Failure = _ => new Bravo.Application.Imports.Common.Exceptions.ImportPermanentException(
             "permanent failure");
 
         var jobId = await CreateJobAsync(maxAttempts: 3);

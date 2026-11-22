@@ -7,7 +7,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Application\Bravo.Application\Bravo.Application.csproj" />
+    <!-- The persistence tests assert statement counts and physical write counts, which requires
+         constructing the internal repositories against a purpose-built NpgsqlDataSource. -->
+    <InternalsVisibleTo Include="Bravo.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Domain\Bravo.Domain\Bravo.Domain.csproj" />
     <ProjectReference Include="..\..\Domain\Bravo.Shared\Bravo.Shared.csproj" />
   </ItemGroup>

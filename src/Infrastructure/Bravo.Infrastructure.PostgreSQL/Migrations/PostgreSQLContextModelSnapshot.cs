@@ -447,54 +447,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.ToTable("ElectionRounds", (string)null);
                 });
 
-            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectionStatistics", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<long?>("Absentees")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("Attendees")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("BlankVotes")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("DatasetVersionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ElectionRoundId")
-                        .HasColumnType("uuid");
-
-                    b.Property<long?>("EligibleVoters")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("NullVotes")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid>("SectionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DatasetVersionId");
-
-                    b.HasIndex("SectionId");
-
-                    b.HasIndex("ElectionRoundId", "SectionId", "DatasetVersionId")
-                        .IsUnique();
-
-                    b.ToTable("ElectionStatistics", (string)null);
-                });
-
             modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectoralOffice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1361,27 +1313,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                         .WithMany()
                         .HasForeignKey("ElectionId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Bravo.Domain.Electoral.Entities.ElectionStatistics", b =>
-                {
-                    b.HasOne("Bravo.Domain.Importing.Entities.DatasetVersion", null)
-                        .WithMany()
-                        .HasForeignKey("DatasetVersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectionRound", null)
-                        .WithMany()
-                        .HasForeignKey("ElectionRoundId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Bravo.Domain.Electoral.Entities.ElectoralSection", null)
-                        .WithMany()
-                        .HasForeignKey("SectionId")
-                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

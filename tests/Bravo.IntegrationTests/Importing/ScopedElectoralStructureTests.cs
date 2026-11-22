@@ -146,8 +146,8 @@ public sealed class ScopedElectoralStructureTests(PostgresContainerFixture pg) :
             CandidateIdentity.Create(null, "PERSON WITHOUT CPF", new DateOnly(1990, 2, 2))
         };
 
-        var first = await candidates.UpsertIdentitiesAsync(identities);
-        var second = await candidates.UpsertIdentitiesAsync(identities);
+        var first = (await candidates.EnsureIdentitiesAsync(identities)).IdsByKey;
+        var second = (await candidates.EnsureIdentitiesAsync(identities)).IdsByKey;
 
         first.Should().HaveCount(2);
         second.Should().HaveCount(2);
@@ -166,7 +166,7 @@ public sealed class ScopedElectoralStructureTests(PostgresContainerFixture pg) :
         // and the row is unique by (name, birth date). The returned key must reflect that.
         var identity = CandidateIdentity.Create("-4", "WITHHELD CPF", new DateOnly(1970, 3, 3));
 
-        var persisted = await candidates.UpsertIdentitiesAsync([identity]);
+        var persisted = (await candidates.EnsureIdentitiesAsync([identity])).IdsByKey;
 
         var key = CandidateIdentityKey.Of("-4", "WITHHELD CPF", new DateOnly(1970, 3, 3));
 
@@ -199,10 +199,10 @@ public sealed class ScopedElectoralStructureTests(PostgresContainerFixture pg) :
 
         var results = await Task.WhenAll(
             Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
-                repository.UpsertIdentitiesAsync(Build(0)))));
+                repository.EnsureIdentitiesAsync(Build(0)))));
 
         // Every caller must observe the same winning id per person.
-        var ids = results.SelectMany(result => result.Values).Distinct().ToArray();
+        var ids = results.SelectMany(result => result.IdsByKey.Values).Distinct().ToArray();
 
         ids.Should().HaveCount(people);
 

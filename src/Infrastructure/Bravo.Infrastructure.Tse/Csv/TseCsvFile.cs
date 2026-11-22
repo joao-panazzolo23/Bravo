@@ -18,7 +18,8 @@ public static class TseCsvFile
             encoding,
             detectEncodingFromByteOrderMarks: false,
             bufferSize: 64 * 1024,
-            leaveOpen: true);
+            leaveOpen: true
+        );
 
         using var csv = new TseCsvReader(reader, delimiter, quote);
 

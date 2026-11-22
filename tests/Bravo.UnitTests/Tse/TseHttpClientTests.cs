@@ -4,7 +4,7 @@ using System.Text;
 using Bravo.Infrastructure.Tse.Clients;
 using Bravo.Infrastructure.Tse.Downloads;
 using Bravo.Infrastructure.Tse.Options;
-using Bravo.Infrastructure.Tse.RateLimiting;
+// using Bravo.Infrastructure.Tse.RateLimiting;
 using Bravo.Infrastructure.Tse.Resilience;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -69,7 +69,7 @@ public sealed class TseHttpClientTests : IDisposable
 
         var client = new TseHttpClient(
             httpClient,
-            new TseRateLimiter(value),
+            // new TseRateLimiter(value),
             new TseBackoffPolicy(value),
             value,
             NullLogger<TseHttpClient>.Instance);
@@ -212,5 +212,149 @@ public sealed class TseHttpClientTests : IDisposable
         var act = () => harness.Client.DownloadCandidateArchiveAsync(2022, _root, cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task ReportsTheActualSizeOfAZeroByteDownload()
+    {
+        var harness = CreateClient((_, _) => Ok(string.Empty));
+
+        var result = await harness.Client.DownloadCandidateArchiveAsync(2022, _root);
+
+        result.SizeBytes.Should().Be(0);
+        result.Sha256.Should().Be(Convert.ToHexStringLower(SHA256.HashData([])));
+        File.Exists(result.FilePath).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AcceptsADownloadExactlyAtTheConfiguredLimit()
+    {
+        var payload = new string('x', 64);
+
+        var harness = CreateClient(
+            (_, _) => Ok(payload),
+            options => options.MaxDownloadBytes = payload.Length);
+
+        var result = await harness.Client.DownloadCandidateArchiveAsync(2022, _root);
+
+        result.SizeBytes.Should().Be(payload.Length);
+    }
+
+    [Fact]
+    public async Task RejectsAThrottledBodyThatExceedsTheLimitWithoutDeclaredLength()
+    {
+        // A chunked response has no Content-Length, so the running total is the only defence.
+        var payload = new string('x', 2_000);
+
+        var harness = CreateClient(
+            (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new NonSeekableStream(Encoding.Latin1.GetBytes(payload)))
+            },
+            options => options.MaxDownloadBytes = 1_000);
+
+        var act = () => harness.Client.DownloadCandidateArchiveAsync(2022, _root);
+
+        await act.Should().ThrowAsync<TseDownloadException>().WithMessage("*exceeded*");
+    }
+
+    [Fact]
+    public async Task DoesNotLeaveAPartialFileWhenTheRunningTotalExceedsTheLimit()
+    {
+        var payload = new string('x', 2_000);
+
+        var harness = CreateClient(
+            (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new NonSeekableStream(Encoding.Latin1.GetBytes(payload)))
+            },
+            options => options.MaxDownloadBytes = 1_000);
+
+        var act = () => harness.Client.DownloadCandidateArchiveAsync(2022, _root);
+
+        await act.Should().ThrowAsync<TseDownloadException>();
+        Directory.GetFiles(_root, "*.part").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ChecksumAndSizeAgreeForABinaryPayload()
+    {
+        var bytes = new byte[100_003];
+        Random.Shared.NextBytes(bytes);
+
+        var harness = CreateClient((_, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new NonSeekableStream(bytes))
+            };
+
+            return response;
+        });
+
+        var result = await harness.Client.DownloadCandidateArchiveAsync(2022, _root);
+
+        result.SizeBytes.Should().Be(bytes.Length);
+        result.Sha256.Should().Be(Convert.ToHexStringLower(SHA256.HashData(bytes)));
+        (await File.ReadAllBytesAsync(result.FilePath)).Should().Equal(bytes);
+    }
+
+    /// <summary>
+    /// A stream whose length is unknown and which can only be read sequentially, so the client
+    /// cannot rely on Content-Length or seeking.
+    /// </summary>
+    private sealed class NonSeekableStream(byte[] payload) : Stream
+    {
+        private readonly MemoryStream _inner = new(payload);
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+            => _inner.Read(buffer, offset, count);
+
+        public override int Read(Span<byte> buffer) => _inner.Read(buffer);
+
+        public override ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+            => _inner.ReadAsync(buffer, cancellationToken);
+
+        public override Task<int> ReadAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken)
+            => _inner.ReadAsync(buffer, offset, count, cancellationToken);
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+            => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                _inner.Dispose();
+
+            base.Dispose(disposing);
+        }
     }
 }

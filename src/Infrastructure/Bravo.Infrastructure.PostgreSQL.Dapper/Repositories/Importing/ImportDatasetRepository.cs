@@ -8,6 +8,12 @@ namespace Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Importing;
 
 internal sealed class ImportDatasetRepository(NpgsqlDataSource dataSource) : IImportDatasetRepository
 {
+    // Re-registering the same file (same provider, dataset, year and checksum) refreshes
+    // UpdatedAt. That is a deliberate semantic, not an oversight: UpdatedAt on this table means
+    // "last time this exact artifact was acquired", which is what makes it possible to tell a
+    // dataset that is still being published from one that disappeared. Changing it to
+    // DO NOTHING would silently drop that information, and introducing an explicit LastSeenAt
+    // column is a product decision. The write is therefore preserved and documented.
     private const string InsertSql = """
         INSERT INTO "ImportDatasets"
             ("Id", "Provider", "Dataset", "ElectionYear", "LayoutVersion", "SourceUrl",

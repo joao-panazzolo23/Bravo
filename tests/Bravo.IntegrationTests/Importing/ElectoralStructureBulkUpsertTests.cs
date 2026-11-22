@@ -101,15 +101,17 @@ public sealed class ElectoralStructureBulkUpsertTests(PostgresContainerFixture p
         var section = ElectoralSection.Create(seed.MunicipalityId, seed.ZoneId, 9901);
         await repository.UpsertSectionsAsync([section]);
 
+        var before = await RowVersionAsync("ElectoralSections", section.Id);
+
         await repository.UpsertSectionsAsync([ElectoralSection.Create(seed.MunicipalityId, seed.ZoneId, 9901)]);
 
-        // Sections have no mutable business column, so the original upsert only refreshed
-        // UpdatedAt. That bookkeeping update is preserved: the stored row and its identifier are
-        // untouched, and no second row appears.
+        // Sections have no mutable business column and nothing reads their UpdatedAt as a
+        // heartbeat, so a repeated key must not produce a write at all.
         (await CountAsync("ElectoralSections", "\"TseSectionNumber\" = 9901", new { })).Should().Be(1);
         (await ScalarAsync<Guid>(
             """SELECT "Id" FROM "ElectoralSections" WHERE "TseSectionNumber" = 9901;"""))
             .Should().Be(section.Id);
+        (await RowVersionAsync("ElectoralSections", section.Id)).Should().Be(before);
     }
 
     [Fact]
@@ -311,7 +313,7 @@ public sealed class ElectoralStructureBulkUpsertTests(PostgresContainerFixture p
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        var action = async () => await repository.UpsertIdentitiesAsync(
+        var action = async () => await repository.EnsureIdentitiesAsync(
             [CandidateIdentity.Create("00011122233", "CANCELLED", null)],
             cancellation.Token);
 

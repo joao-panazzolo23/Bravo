@@ -8,12 +8,6 @@ public sealed class TseOptions
 
     public int HttpTimeoutSeconds { get; set; } = 300;
 
-    public int MaxConcurrentDownloads { get; set; } = 2;
-
-    public int MaxQueuedDownloads { get; set; } = 12;
-
-    public int MinDelayBetweenRequestsMs { get; set; } = 250;
-
     public int MaxRetryAttempts { get; set; } = 3;
 
     public int RetryBaseDelayMs { get; set; } = 500;
@@ -24,7 +18,7 @@ public sealed class TseOptions
         Path.Combine(Path.GetTempPath(), "bravo-tse");
 
     public long MaxDownloadBytes { get; set; } =
-        2L * 1024 * 1024 * 1024;
+        10L * 1024 * 1024 * 1024;
 
     public long MaxExtractedBytes { get; set; } =
         8L * 1024 * 1024 * 1024;

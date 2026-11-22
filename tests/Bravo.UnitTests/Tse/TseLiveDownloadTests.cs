@@ -1,7 +1,7 @@
 using Bravo.Infrastructure.Tse.Clients;
 using Bravo.Infrastructure.Tse.Extraction;
 using Bravo.Infrastructure.Tse.Options;
-using Bravo.Infrastructure.Tse.RateLimiting;
+// using Bravo.Infrastructure.Tse.RateLimiting;
 using Bravo.Infrastructure.Tse.Resilience;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -38,7 +38,7 @@ public sealed class TseLiveDownloadTests : IDisposable
 
         var client = new TseHttpClient(
             httpClient,
-            new TseRateLimiter(value),
+            // new TseRateLimiter(value),
             new TseBackoffPolicy(value),
             value,
             NullLogger<TseHttpClient>.Instance);

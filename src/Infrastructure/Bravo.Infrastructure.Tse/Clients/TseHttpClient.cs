@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using Bravo.Application.Logging;
 using Bravo.Infrastructure.Tse.Downloads;
 using Bravo.Infrastructure.Tse.Options;
-using Bravo.Infrastructure.Tse.RateLimiting;
 using Bravo.Infrastructure.Tse.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,19 +10,11 @@ using Microsoft.Extensions.Options;
 namespace Bravo.Infrastructure.Tse.Clients;
 
 /// <summary>
-/// Encapsulates every HTTP operation against the TSE open-data CDN.
-/// </summary>
-/// <remarks>
-/// TSE publishes bulk datasets as ZIP archives, so the only operation is a streamed download.
-/// This type owns the endpoint layout, the request lifecycle, the concurrency limit, the retry
-/// policy, status handling, size enforcement and checksum calculation. Callers receive a
-/// verified file on disk and never see transport details.
-///
-/// Usage: <c>await client.DownloadCandidateArchiveAsync(2022, tempDirectory, token)</c>
+/// todo: refactor this trash
 /// </remarks>
 public sealed class TseHttpClient(
     HttpClient client,
-    TseRateLimiter rateLimiter,
+    // TseRateLimiter rateLimiter,
     TseBackoffPolicy backoff,
     IOptions<TseOptions> options,
     ILogger<TseHttpClient> logger)
@@ -138,10 +129,6 @@ public sealed class TseHttpClient(
         string partialPath,
         CancellationToken cancellationToken)
     {
-        using var lease = await rateLimiter.AcquireAsync(cancellationToken);
-
-        if (!lease.IsAcquired)
-            throw new TseDownloadException("The TSE download concurrency limit is exhausted.");
 
         using var response = await client.GetAsync(
             relativeUrl,
@@ -201,6 +188,8 @@ public sealed class TseHttpClient(
             if (read == 0)
                 break;
 
+            // The cap is enforced against the running total rather than the declared length,
+            // because a chunked response has no Content-Length and a declared value can lie.
             total = EnsureWithinLimit(total + read);
 
             hasher.TransformBlock(buffer, 0, read, null, 0);
@@ -212,6 +201,10 @@ public sealed class TseHttpClient(
         return (total, Convert.ToHexStringLower(hasher.Hash!));
     }
 
+    /// <summary>
+    /// Rejects the download as soon as the bytes already received exceed the configured cap, so
+    /// the partial file is abandoned before the remaining payload is transferred.
+    /// </summary>
     private long EnsureWithinLimit(long totalBytes)
     {
         if (totalBytes > _options.MaxDownloadBytes)

@@ -112,38 +112,4 @@ public sealed class ImportLogTests
         entry.Properties["MaxAttempts"].Should().Be(3);
         entry.Properties["RetryAt"].Should().Be(retryAt);
     }
-
-    [Fact]
-    public void WorkUnitLifecycleEventsEmitCorrectEventIds()
-    {
-        var unitId = Guid.NewGuid();
-        var exception = new TimeoutException("Timeout during unit");
-
-        ImportLog.WorkUnitStarted(_logger, unitId, "cand:2022:AC");
-        ImportLog.WorkUnitCompleted(_logger, unitId, "cand:2022:AC", 542L);
-        ImportLog.WorkUnitRecovered(_logger, unitId, "cand:2022:AC");
-        ImportLog.WorkUnitRetried(_logger, unitId, "cand:2022:AC", 2, exception);
-        ImportLog.WorkUnitFailed(_logger, unitId, "cand:2022:AC", exception);
-
-        var entries = _logger.Entries.OrderBy(x => x.EventId.Id).ToArray();
-        entries.Should().HaveCount(5);
-
-        entries[0].EventId.Id.Should().Be(1010);
-        entries[0].LogLevel.Should().Be(LogLevel.Information);
-
-        entries[1].EventId.Id.Should().Be(1011);
-        entries[1].LogLevel.Should().Be(LogLevel.Information);
-        entries[1].Properties["ProcessedRecords"].Should().Be(542L);
-
-        entries[2].EventId.Id.Should().Be(1012);
-        entries[2].LogLevel.Should().Be(LogLevel.Information);
-
-        entries[3].EventId.Id.Should().Be(1013);
-        entries[3].LogLevel.Should().Be(LogLevel.Warning);
-        entries[3].Exception.Should().BeSameAs(exception);
-
-        entries[4].EventId.Id.Should().Be(1014);
-        entries[4].LogLevel.Should().Be(LogLevel.Error);
-        entries[4].Exception.Should().BeSameAs(exception);
-    }
 }
