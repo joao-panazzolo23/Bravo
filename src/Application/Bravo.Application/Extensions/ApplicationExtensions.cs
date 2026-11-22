@@ -1,6 +1,5 @@
 using Bravo.Application.Behaviors;
 using Bravo.Application.Imports.Ibge;
-using Bravo.Application.Imports.Tse;
 using Bravo.Shared.Notifications;
 using FluentValidation;
 using Mediator;
@@ -8,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Bravo.Application.Notifications;
 using Bravo.Application.Imports;
+using Bravo.Application.Tse;
 namespace Bravo.Application.Extensions;
 
 public static class ApplicationExtensions

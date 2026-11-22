@@ -1,6 +1,6 @@
 using Bravo.Domain.Electoral.Models;
 
-namespace Bravo.Application.Imports.Tse.Models;
+namespace Bravo.Application.Tse.Models;
 
 /// <summary>
 /// The distinct geographic and electoral keys a results file references, collected during the

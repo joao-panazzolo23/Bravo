@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using Bravo.Application.Imports.Common.Execution;
-using Bravo.Application.Imports.Tse.Models;
+using Bravo.Application.Imports.Tse.Services;
 using Bravo.Application.Logging;
+using Bravo.Application.Tse.Models;
 using Bravo.Domain.Electoral.Entities;
-using Bravo.Domain.Electoral.Models;
 using Bravo.Domain.Electoral.Repositories;
 using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Geography.Repositories;
@@ -12,7 +12,7 @@ using Bravo.Domain.Importing.Enums;
 using Bravo.Domain.Importing.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Bravo.Application.Imports.Tse.Services;
+namespace Bravo.Application.Tse.Services;
 
 /// <summary>
 /// Imports section-level structure and voting results for every (year, state) pair.
@@ -44,7 +44,8 @@ public sealed class TseResultImporter(
     DatasetVersionService datasetVersions,
     TseImportSession session,
     ImportResourceGovernor resources,
-    ILogger<TseResultImporter> logger)
+    ILogger<TseResultImporter> logger
+)
 {
     public async Task RunAsync(
         ImportExecutionContext context,
@@ -100,7 +101,7 @@ public sealed class TseResultImporter(
             });
     }
 
-    private async Task<TseScopeOutcome> ImportScopeAsync(
+    private async Task<TseScopeOutcomeDto> ImportScopeAsync(
         int year,
         string state,
         TseElectionLookup electionLookup,
@@ -130,7 +131,7 @@ public sealed class TseResultImporter(
         }
     }
 
-    private async Task<TseScopeOutcome> ImportRowsAsync(
+    private async Task<TseScopeOutcomeDto> ImportRowsAsync(
         int year,
         string state,
         AcquiredDataset dataset,
@@ -148,7 +149,7 @@ public sealed class TseResultImporter(
         var keys = await CollectStructureKeysAsync(dataset, cancellationToken);
 
         if (keys.SectionCount == 0)
-            return TseScopeOutcome.Empty;
+            return TseScopeOutcomeDto.Empty;
 
         var municipalityIds = await ResolveMunicipalitiesAsync(keys, stateId, year, cancellationToken);
 
@@ -207,8 +208,13 @@ public sealed class TseResultImporter(
         {
             await using var stream = File.OpenRead(dataset.FilePath);
 
-            await foreach (var row in sectionReader.ReadAsync(
-                               stream, dataset.LayoutVersion, cancellationToken))
+            await foreach (var row in
+                            sectionReader.ReadAsync(
+                                            stream,
+                                            dataset.LayoutVersion,
+                                            cancellationToken
+                                        )
+            )
             {
                 // A non-positive location number is a source sentinel, not a place. Warn once
                 // per scope so the data gap is visible without logging a line per row.
@@ -217,7 +223,11 @@ public sealed class TseResultImporter(
                     keys.SawSentinelPollingPlace = true;
 
                     ResourceLog.InvalidPollingPlaceSkipped(
-                        logger, row.PollingPlaceNumber, row.Year, row.StateAcronym);
+                        logger,
+                        row.PollingPlaceNumber,
+                        row.Year,
+                        row.StateAcronym
+                    );
                 }
 
                 keys.Observe(row);
@@ -227,7 +237,7 @@ public sealed class TseResultImporter(
         return keys;
     }
 
-    private async Task<TseScopeOutcome> StreamResultsAsync(
+    private async Task<TseScopeOutcomeDto> StreamResultsAsync(
         AcquiredDataset dataset,
         int year,
         string state,
@@ -240,7 +250,8 @@ public sealed class TseResultImporter(
         IReadOnlyDictionary<int, Guid> partyByNumber,
         TseElectionLookup electionLookup,
         int batchSize,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var candidateIds = await LoadCandidateIdsAsync(keys, stateId, electionLookup, cancellationToken);
 
@@ -291,7 +302,7 @@ public sealed class TseResultImporter(
             },
             cancellationToken);
 
-        return new TseScopeOutcome(Interlocked.Read(ref imported), Interlocked.Read(ref rejected));
+        return new TseScopeOutcomeDto(Interlocked.Read(ref imported), Interlocked.Read(ref rejected));
     }
 
     /// <summary>
@@ -378,21 +389,4 @@ public sealed class TseResultImporter(
             MaxDegreeOfParallelism = Math.Max(1, context.MaxParallelism),
             CancellationToken = cancellationToken
         };
-}
-
-/// <summary>
-/// Counts for one (year, state) scope: how many rows were persisted and how many the source could
-/// not resolve.
-/// </summary>
-public readonly record struct TseScopeOutcome(long Imported, long Rejected)
-{
-    public static TseScopeOutcome Empty => new(0, 0);
-}
-
-/// <summary>
-/// One batch of accumulated results handed from the parser to persistence.
-/// </summary>
-public sealed record TseResultBatch(Dictionary<TseResultKey, long> Values)
-{
-    public int Count => Values.Count;
 }

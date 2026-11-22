@@ -3,8 +3,7 @@ using Bravo.Domain.Electoral.Services;
 using Bravo.Domain.Geography.Entities;
 using Microsoft.Extensions.Logging;
 using Bravo.Domain.Geography.Repositories;
-
-using Bravo.Application.Imports.Tse.Models;
+using Bravo.Application.Tse.Models;
 
 namespace Bravo.Application.Imports.Tse.Services;
 

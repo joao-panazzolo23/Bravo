@@ -1,8 +1,9 @@
 using Bravo.Application.Imports.Tse.Services;
+using Bravo.Application.Tse.Services;
 using Bravo.Domain.Importing.Models;
 using Bravo.Domain.Importing.Services;
 
-namespace Bravo.Application.Imports.Tse;
+namespace Bravo.Application.Tse;
 
 /// <summary>
 /// TSE import facade.

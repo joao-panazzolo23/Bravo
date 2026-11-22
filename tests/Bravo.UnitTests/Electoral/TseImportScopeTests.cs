@@ -1,6 +1,6 @@
 using Bravo.Application.Imports.Tse;
-using Bravo.Application.Imports.Tse.Models;
 using Bravo.Application.Imports.Tse.Services;
+using Bravo.Application.Tse.Models;
 using FluentAssertions;
 
 namespace Bravo.UnitTests.Electoral;

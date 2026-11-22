@@ -1,4 +1,4 @@
-namespace Bravo.Application.Imports.Tse.Models;
+namespace Bravo.Application.Tse.Models;
 
 /// <summary>
 /// Static facts about the TSE datasets: which years exist, which states publish results, and

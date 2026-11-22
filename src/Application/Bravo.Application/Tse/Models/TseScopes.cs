@@ -1,4 +1,4 @@
-namespace Bravo.Application.Imports.Tse.Models;
+namespace Bravo.Application.Tse.Models;
 
 /// <summary>
 /// Geographic scopes TSE publishes that IBGE does not model as states.

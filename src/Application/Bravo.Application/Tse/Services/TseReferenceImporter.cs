@@ -1,6 +1,6 @@
 using Bravo.Application.Imports.Common.Execution;
-using Bravo.Application.Imports.Tse.Models;
 using Bravo.Application.Logging;
+using Bravo.Application.Tse.Models;
 using Bravo.Domain.Electoral.Entities;
 using Bravo.Domain.Electoral.Models;
 using Bravo.Domain.Electoral.Repositories;

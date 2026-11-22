@@ -1,4 +1,4 @@
-using Bravo.Application.Imports.Tse.Models;
+using Bravo.Application.Tse.Models;
 
 namespace Bravo.Application.Imports.Tse.Services;
 

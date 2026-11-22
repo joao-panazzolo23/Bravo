@@ -1,4 +1,4 @@
-namespace Bravo.Application.Imports.Tse.Models;
+namespace Bravo.Application.Tse.Models;
 
 /// <summary>
 /// Immutable snapshot of every election and round, keyed by TSE election code.
@@ -23,7 +23,7 @@ public sealed class TseElectionLookup
     }
 
     public static async Task<TseElectionLookup> LoadAsync(
-        Bravo.Domain.Electoral.Repositories.IElectionRepository elections,
+        Domain.Electoral.Repositories.IElectionRepository elections,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(elections);

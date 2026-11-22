@@ -1,6 +1,4 @@
-using Bravo.Application.Imports.Tse.Services;
-
-namespace Bravo.Application.Imports.Tse.Models;
+namespace Bravo.Application.Tse.Models;
 
 /// <summary>
 /// Aggregates TSE result rows into batches of distinct result keys.

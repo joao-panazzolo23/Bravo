@@ -1,6 +1,6 @@
 using Bravo.Domain.Electoral.Enums;
 
-namespace Bravo.Application.Imports.Tse.Models;
+namespace Bravo.Application.Tse.Models;
 
 /// <summary>
 /// The canonical identifiers of one accumulated result row.

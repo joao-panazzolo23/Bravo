@@ -1,0 +1,22 @@
+{
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+    "description": "Bravo - Brazilian Voting Obscenities",
+    "name": "io.github.joao-panazzolo23/Bravo",
+    "version": "0.1.0-beta",
+    "packages": [
+        {
+            "registryType": "nuget",
+            "identifier": "<your package ID here>",
+            "version": "0.1.0-beta",
+            "transport": {
+                "type": "stdio"
+            },
+            "packageArguments": [],
+            "environmentVariables": []
+        }
+    ],
+    "repository": {
+        "url": "https://github.com/joao-panazzolo23/Bravo",
+        "source": "github"
+    }
+}

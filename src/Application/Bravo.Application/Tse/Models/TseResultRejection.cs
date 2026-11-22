@@ -1,4 +1,4 @@
-namespace Bravo.Application.Imports.Tse.Services;
+namespace Bravo.Application.Tse.Models;
 
 /// <summary>
 /// Why a source row could not be turned into a result key.

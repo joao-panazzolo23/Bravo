@@ -1,4 +1,4 @@
-namespace Bravo.Application.Imports.Tse.Models;
+namespace Bravo.Application.Tse.Models;
 
 /// <summary>
 /// Immmutable identifier maps for one state's electoral structure, loaded after the structure

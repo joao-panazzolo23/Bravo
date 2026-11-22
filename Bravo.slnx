@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/integrations/">
+    <Project Path="integrations/Bravo.ModelContextProtocol/Bravo.ModelContextProtocol.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <File Path="Dockerfile" />
   </Folder>

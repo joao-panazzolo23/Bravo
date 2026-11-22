@@ -1,8 +1,9 @@
 using Bravo.Application.Imports.Tse.Services;
+using Bravo.Application.Tse.Services;
 using Bravo.Domain.Importing.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Bravo.Application.Imports.Tse;
+namespace Bravo.Application.Tse;
 
 /// <summary>
 /// Registers the TSE import module.
