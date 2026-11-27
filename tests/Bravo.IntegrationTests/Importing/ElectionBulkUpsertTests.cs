@@ -101,7 +101,7 @@ public sealed class ElectionBulkUpsertTests(PostgresContainerFixture pg) : BulkP
         var election = await repository.UpsertAsync(Build());
 
         var round = await repository.UpsertRoundAsync(
-            ElectionRound.Create(election.Id, 1, "1º turno"));
+            ElectionRound.Create(election.Id, 1));
 
         round.ElectionId.Should().Be(election.Id);
         round.Round.Should().Be(1);
@@ -117,33 +117,30 @@ public sealed class ElectionBulkUpsertTests(PostgresContainerFixture pg) : BulkP
         var repository = Repository(scope.ServiceProvider);
 
         var election = await repository.UpsertAsync(Build());
-        var first = await repository.UpsertRoundAsync(ElectionRound.Create(election.Id, 1, "1º turno"));
+        var first = await repository.UpsertRoundAsync(ElectionRound.Create(election.Id, 1));
 
         var versionBefore = await RowVersionAsync("ElectionRounds", first.Id);
 
-        var second = await repository.UpsertRoundAsync(ElectionRound.Create(election.Id, 1, "1º turno"));
+        var second = await repository.UpsertRoundAsync(ElectionRound.Create(election.Id, 1));
 
         second.Id.Should().Be(first.Id);
         (await RowVersionAsync("ElectionRounds", first.Id)).Should().Be(versionBefore);
     }
 
     [Fact]
-    public async Task AChangedRoundNameIsUpdatedAndKeepsItsIdentity()
+    public async Task ARunoffRoundIsFlaggedAndKeepsItsIdentity()
     {
         await using var scope = Pg.Factory.Services.CreateAsyncScope();
         var repository = Repository(scope.ServiceProvider);
 
         var election = await repository.UpsertAsync(Build());
-        var first = await repository.UpsertRoundAsync(ElectionRound.Create(election.Id, 2, "2º turno"));
-        var versionBefore = await RowVersionAsync("ElectionRounds", first.Id);
+        var first = await repository.UpsertRoundAsync(ElectionRound.Create(election.Id, 2));
 
-        var second = await repository.UpsertRoundAsync(
-            ElectionRound.Create(election.Id, 2, "Segundo turno"));
+        var second = await repository.UpsertRoundAsync(ElectionRound.Create(election.Id, 2));
 
         second.Id.Should().Be(first.Id);
-        second.Name.Should().Be("Segundo turno");
+        second.Round.Should().Be(2);
         second.IsRunoff.Should().BeTrue();
-        (await RowVersionAsync("ElectionRounds", first.Id)).Should().NotBe(versionBefore);
     }
 
     [Fact]
@@ -179,7 +176,7 @@ public sealed class ElectionBulkUpsertTests(PostgresContainerFixture pg) : BulkP
             await using var scope = Pg.Factory.Services.CreateAsyncScope();
             var repository = Repository(scope.ServiceProvider);
 
-            return await repository.UpsertRoundAsync(ElectionRound.Create(electionId, 1, "1º turno"));
+            return await repository.UpsertRoundAsync(ElectionRound.Create(electionId, 1));
         })));
 
         results.Select(round => round.Id).Distinct().Should().ContainSingle();
@@ -198,7 +195,7 @@ public sealed class ElectionBulkUpsertTests(PostgresContainerFixture pg) : BulkP
         foreach (var election in elections)
         {
             var stored = await repository.UpsertAsync(election);
-            await repository.UpsertRoundAsync(ElectionRound.Create(stored.Id, 1, "1º turno"));
+            await repository.UpsertRoundAsync(ElectionRound.Create(stored.Id, 1));
         }
 
         var electionVersions = await ScalarAsync<string>(
@@ -209,7 +206,7 @@ public sealed class ElectionBulkUpsertTests(PostgresContainerFixture pg) : BulkP
         foreach (var election in elections)
         {
             var stored = await repository.UpsertAsync(election);
-            await repository.UpsertRoundAsync(ElectionRound.Create(stored.Id, 1, "1º turno"));
+            await repository.UpsertRoundAsync(ElectionRound.Create(stored.Id, 1));
         }
 
         (await ScalarAsync<string>(

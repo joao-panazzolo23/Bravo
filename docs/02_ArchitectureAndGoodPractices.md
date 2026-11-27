@@ -190,6 +190,9 @@ https://refactoring.guru/design-patterns
 
 Classes should be small and concise. They must have maximum one reason to change.
 
+When dealing with domain-related numbers that represent something, please, use Enums instead of numbers.
+"RoleType" = User is much more readable than = 1.
+
 ## 6. Dependency Injection
 
 Follow the existing dependency injection conventions.

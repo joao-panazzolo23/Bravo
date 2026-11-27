@@ -30,11 +30,11 @@ public sealed class ElectionResultIdempotencyTests(PostgresContainerFixture pg) 
             """,
             new { election.Id });
 
-        var round = ElectionRound.Create(election.Id, 1, "1o turno");
+        var round = ElectionRound.Create(election.Id, 1);
         await Db.ExecuteAsync(
             """
-            INSERT INTO "ElectionRounds" ("Id","ElectionId","Round","Name","IsRunoff","CreatedAt","UpdatedAt")
-            VALUES (@Id,@ElectionId,1,'1o turno',false,now(),now());
+            INSERT INTO "ElectionRounds" ("Id","ElectionId","Round","IsRunoff","CreatedAt","UpdatedAt")
+            VALUES (@Id,@ElectionId,1,false,now(),now());
             """,
             new { round.Id, round.ElectionId });
 

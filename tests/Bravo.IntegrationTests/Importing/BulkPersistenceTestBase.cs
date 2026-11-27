@@ -38,12 +38,12 @@ public abstract class BulkPersistenceTestBase(PostgresContainerFixture pg) : Imp
         var electionId = await Db.ExecuteScalarAsync<Guid>(
             """SELECT "Id" FROM "Elections" WHERE "TseElectionCode" = 9100;""");
 
-        var round = ElectionRound.Create(electionId, 1, "1o turno");
+        var round = ElectionRound.Create(electionId, 1);
 
         await Db.ExecuteAsync(
             """
-            INSERT INTO "ElectionRounds" ("Id","ElectionId","Round","Name","IsRunoff","CreatedAt","UpdatedAt")
-            VALUES (@Id,@ElectionId,1,'1o turno',false,now(),now())
+            INSERT INTO "ElectionRounds" ("Id","ElectionId","Round","IsRunoff","CreatedAt","UpdatedAt")
+            VALUES (@Id,@ElectionId,1,false,now(),now())
             ON CONFLICT ("ElectionId","Round") DO NOTHING;
             """,
             new { round.Id, ElectionId = electionId });

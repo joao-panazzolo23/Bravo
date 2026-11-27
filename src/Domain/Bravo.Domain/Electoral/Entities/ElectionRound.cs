@@ -6,12 +6,11 @@ public class ElectionRound : Entity
 {
     public Guid ElectionId { get; private set; }
     public short Round { get; private set; }
-    public string Name { get; private set; } = string.Empty;
     public bool IsRunoff { get; private set; }
 
     private ElectionRound() { }
 
-    public static ElectionRound Create(Guid electionId, short round, string name)
+    public static ElectionRound Create(Guid electionId, short round)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(round);
 
@@ -19,7 +18,6 @@ public class ElectionRound : Entity
         {
             ElectionId = electionId,
             Round = round,
-            Name = name,
             IsRunoff = round > 1
         };
 

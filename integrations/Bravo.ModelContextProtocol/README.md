@@ -1,35 +1,50 @@
-# MCP Server
+# BRAVO MCP Server
 
-This README was created using the C# MCP server project template.
-It demonstrates how you can easily create an MCP server using C# and publish it as a NuGet package.
+A [Model Context Protocol](https://modelcontextprotocol.io/) stdio server that exposes the BRAVO
+electoral analytics read model to MCP clients. Every tool is a thin adapter over the Application
+analytics queries, so an MCP client and the HTTP API answer with the same calculations, the same
+valid filters and the same limitations.
 
-The MCP server is built as a self-contained application and does not require the .NET runtime to be installed on the target machine.
-However, since it is self-contained, it must be built for each target platform separately.
-By default, the template is configured to build for:
-* `win-x64`
-* `win-arm64`
-* `osx-arm64`
-* `linux-x64`
-* `linux-arm64`
-* `linux-musl-x64`
+## Tools
 
-If your users require more platforms to be supported, update the list of runtime identifiers in the project's `<RuntimeIdentifiers />` element.
+| Tool | Purpose |
+| --- | --- |
+| `find_vote_concentration` | Sections where a candidate reached a share of valid votes inside a window (paginated). |
+| `rank_vote_concentration` | Sections ordered by a candidate's share of valid votes. |
+| `get_municipality_performance` | A candidate's votes, valid votes, share and rank per municipality. |
+| `get_municipality_margins` | Municipalities ordered by the margin between their two strongest candidates. |
+| `get_regional_dominance` | Municipalities contested/won and share statistics per state. |
+| `get_turnout_composition` | Votes cast, valid, blank and null at section/municipality/zone/state level. |
+| `detect_outliers` | Sections deviating from a reference population by a Z-score threshold. |
+| `compare_election_years` | One candidate's performance between two election years. |
+| `compare_election_rounds` | One candidate's performance between two rounds of the same election. |
+| `get_candidate_identity_history` | Every candidacy of a candidate identity across elections. |
 
-See [aka.ms/nuget/mcp/guide](https://aka.ms/nuget/mcp/guide) for the full guide.
+## Analytical rules the tools follow
 
-## Checklist before publishing to NuGet.org
+- **Rounds and offices are never mixed.** A result belongs to one office and one round; share-based
+  tools require both.
+- **Valid votes** are nominal plus party ballots. Blank and null ballots are reported separately and
+  never enter a candidate denominator.
+- **Only active dataset versions are read**, so a re-import is never double counted.
+- **Turnout is not inferred.** The database stores no eligible-voter source, so attendance,
+  abstention and turnout are returned as `null`; blank and null shares use votes cast.
+- **Outliers are statistical only.** A deviation is never labelled fraud, manipulation or an
+  irregularity.
+- **Candidate identities are not parties.** An identity is a person, not a party, coalition or
+  ideology.
 
-- Test the MCP server locally using the steps below.
-- Update the package metadata in the .csproj file, in particular the `<PackageId>`.
-- Update `.mcp/server.json` to declare your MCP server's inputs.
-  - See [configuring inputs](https://aka.ms/nuget/mcp/guide/configuring-inputs) for more details.
-- Pack the project using `dotnet pack`.
+## Configuration
 
-The `bin/Release` directory will contain the package file (.nupkg), which can be [published to NuGet.org](https://learn.microsoft.com/nuget/nuget-org/publish-a-package).
+The server reads the standard `PostgreSQL` options section, so a connection string can be passed as
+an environment variable:
+
+```bash
+PostgreSQL__Connection="Host=localhost;Port=5432;Database=Bravo;Username=postgres;Password=postgres" \
+  dotnet run --project integrations/Bravo.ModelContextProtocol
+```
 
 ## Developing locally
-
-To test this MCP server from source code (locally) without using a built MCP server package, you can configure your IDE to run the project directly using `dotnet run`.
 
 ```json
 {
@@ -37,61 +52,16 @@ To test this MCP server from source code (locally) without using a built MCP ser
     "Bravo.ModelContextProtocol": {
       "type": "stdio",
       "command": "dotnet",
-      "args": [
-        "run",
-        "--project",
-        "<PATH TO PROJECT DIRECTORY>"
-      ]
+      "args": ["run", "--project", "<PATH TO PROJECT DIRECTORY>"],
+      "env": {
+        "PostgreSQL__Connection": "Host=localhost;Port=5432;Database=Bravo;Username=postgres;Password=postgres"
+      }
     }
   }
 }
 ```
-
-Refer to the VS Code or Visual Studio documentation for more information on configuring and using MCP servers:
-
-- [Use MCP servers in VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers)
-- [Use MCP servers in Visual Studio](https://learn.microsoft.com/visualstudio/ide/mcp-servers)
-
-## Testing the MCP Server
-
-Once configured, you can ask Copilot Chat for a random number, for example, `Give me 3 random numbers`. It should prompt you to use the `get_random_number` tool on the `Bravo.ModelContextProtocol` MCP server and show you the results.
 
 ## Publishing to NuGet.org
 
-1. Run `dotnet pack -c Release` to create the NuGet package
-2. Publish to NuGet.org with `dotnet nuget push bin/Release/*.nupkg --api-key <your-api-key> --source https://api.nuget.org/v3/index.json`
-
-## Using the MCP Server from NuGet.org
-
-Once the MCP server package is published to NuGet.org, you can configure it in your preferred IDE. Both VS Code and Visual Studio use the `dnx` command to download and install the MCP server package from NuGet.org.
-
-- **VS Code**: Create a `<WORKSPACE DIRECTORY>/.vscode/mcp.json` file
-- **Visual Studio**: Create a `<SOLUTION DIRECTORY>\.mcp.json` file
-
-For both VS Code and Visual Studio, the configuration file uses the following server definition:
-
-```json
-{
-  "servers": {
-    "Bravo.ModelContextProtocol": {
-      "type": "stdio",
-      "command": "dnx",
-      "args": [
-        "<your package ID here>",
-        "--version",
-        "<your package version here>",
-        "--yes"
-      ]
-    }
-  }
-}
-```
-
-## More information
-
-.NET MCP servers use the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) C# SDK. For more information about MCP:
-
-- [Official Documentation](https://modelcontextprotocol.io/)
-- [Protocol Specification](https://spec.modelcontextprotocol.io/)
-- [GitHub Organization](https://github.com/modelcontextprotocol)
-- [MCP C# SDK](https://csharp.sdk.modelcontextprotocol.io/)
+1. Run `dotnet pack -c Release` to create the NuGet package.
+2. Publish with `dotnet nuget push bin/Release/*.nupkg --api-key <your-api-key> --source https://api.nuget.org/v3/index.json`.

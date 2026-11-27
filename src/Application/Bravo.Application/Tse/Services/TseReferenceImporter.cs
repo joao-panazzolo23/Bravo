@@ -82,8 +82,6 @@ public sealed class TseReferenceImporter(
                     $"Reference {year}");
             });
 
-        // Elections and rounds were written above and are small and bounded, so one immutable
-        // snapshot serves every later stage for the whole job execution.
         return await TseElectionLookup.LoadAsync(elections, cancellationToken);
     }
 
@@ -146,17 +144,32 @@ public sealed class TseReferenceImporter(
 
     private async Task UpsertElectionAsync(
         TseElectionReference row,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
-        var election = await elections.UpsertAsync(
-            Election.Create(row.Code, row.Year, row.TypeCode, row.TypeName, row.Description, row.Date),
-            cancellationToken);
+        var model = Election.Create(
+            row.Code,
+            row.Year,
+            row.TypeCode,
+            row.TypeName,
+            row.Description,
+            row.Date
+        );
 
-        var roundName = row.Round == 1 ? "1º turno" : $"{row.Round}º turno";
+        var election = await elections.UpsertAsync(
+            model,
+            cancellationToken
+        );
+
+        var electionRound = ElectionRound.Create(
+            election.Id,
+            row.Round
+        );
 
         await elections.UpsertRoundAsync(
-            ElectionRound.Create(election.Id, row.Round, roundName),
-            cancellationToken);
+            electionRound,
+            cancellationToken
+        );
     }
 
     private static ParallelOptions ParallelOptionsFor(
