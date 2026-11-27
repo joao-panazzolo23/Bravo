@@ -6,6 +6,7 @@ public class Election : Entity
 {
     public int TseElectionCode { get; private set; }
     public int Year { get; private set; }
+    ///What does that even mean? TODO: Replace it with enum.
     public int TypeCode { get; private set; }
     public string TypeName { get; private set; } = string.Empty;
     public string Description { get; private set; } = string.Empty;
@@ -19,7 +20,8 @@ public class Election : Entity
         int typeCode,
         string typeName,
         string description,
-        DateOnly? electionDate)
+        DateOnly? electionDate
+    )
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(tseElectionCode);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(year);

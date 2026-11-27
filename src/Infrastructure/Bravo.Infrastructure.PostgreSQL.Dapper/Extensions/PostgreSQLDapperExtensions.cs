@@ -1,7 +1,9 @@
 using Bravo.Domain.Importing.Services;
 using Bravo.Domain.Geography.Entities;
 using Bravo.Domain.Users.Repositories;
+using Bravo.Domain.Electoral.Analytics;
 using Bravo.Infrastructure.PostgreSQL.Dapper.Options;
+using Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Analytics;
 using Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Importing;
 using Bravo.Infrastructure.PostgreSQL.Dapper.Repositories.Users;
 using Bravo.Infrastructure.PostgreSQL.Dapper.Sessions;
@@ -27,7 +29,22 @@ public static class PostgreSQLDapperExtensions
 
     private static IServiceCollection AddQueryRepositories(this IServiceCollection services)
     {
-        return services.AddScoped<IUserQueryRepository, UserQueryRepository>();
+        return services.AddScoped<IUserQueryRepository, UserQueryRepository>()
+                       .AddAnalyticsRepositories();
+    }
+
+    private static IServiceCollection AddAnalyticsRepositories(this IServiceCollection services)
+    {
+        return services.AddScoped<ElectionDataAnalytics>()
+                       .AddScoped<VoteConcentrationQueries>()
+                       .AddScoped<MunicipalityPerformanceQueries>()
+                       .AddScoped<MunicipalityMarginQueries>()
+                       .AddScoped<TurnoutCompositionQueries>()
+                       .AddScoped<SectionOutlierQueries>()
+                       .AddScoped<RegionalDominanceQueries>()
+                       .AddScoped<ElectionPerformanceQueries>()
+                       .AddScoped<IElectionDataAnalytics>(provider =>
+                           provider.GetRequiredService<ElectionDataAnalytics>());
     }
 
     private static IServiceCollection AddImportRepositories(this IServiceCollection services)

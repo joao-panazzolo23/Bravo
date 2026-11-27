@@ -58,7 +58,7 @@ public sealed class ImportJobExecutorTests(PostgresContainerFixture pg) : Import
     [Fact]
     public async Task FailedJobIsScheduledForRetryWhenTransient()
     {
-        Source.Failure = _ => new Bravo.Application.Imports.Common.Exceptions.ImportTransientException(
+        Source.Failure = _ => new Bravo.Application.Imports.Exceptions.ImportTransientException(
             "temporary failure", TimeSpan.FromMilliseconds(10));
 
         var jobId = await CreateJobAsync(maxAttempts: 3);

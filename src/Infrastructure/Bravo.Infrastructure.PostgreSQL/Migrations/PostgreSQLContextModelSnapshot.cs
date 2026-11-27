@@ -428,11 +428,6 @@ namespace Bravo.Infrastructure.PostgreSQL.Migrations
                     b.Property<bool>("IsRunoff")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
-
                     b.Property<short>("Round")
                         .HasColumnType("smallint");
 

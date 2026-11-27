@@ -21,8 +21,8 @@ public sealed class TseElectionLookupTests
 
         var lookup = await TseElectionLookup.LoadAsync(new FakeElectionRepository(
             [first, second],
-            [ElectionRound.Create(first.Id, 1, "1o turno"),
-             ElectionRound.Create(second.Id, 2, "2o turno")]));
+            [ElectionRound.Create(first.Id, 1),
+             ElectionRound.Create(second.Id, 2)]));
 
         lookup.TryGetElectionId(544, out var resolvedFirst).Should().BeTrue();
         lookup.TryGetElectionId(545, out var resolvedSecond).Should().BeTrue();
@@ -47,11 +47,11 @@ public sealed class TseElectionLookupTests
     public async Task RoundsAreMatchedToTheirElectionCode()
     {
         var election = Election.Create(544, 2022, 1, "ORDINARIA", "2022", null);
-        var runoff = ElectionRound.Create(Guid.CreateVersion7(), 2, "2o turno");
+        var runoff = ElectionRound.Create(Guid.CreateVersion7(), 2);
 
         var lookup = await TseElectionLookup.LoadAsync(new FakeElectionRepository(
             [election],
-            [ElectionRound.Create(election.Id, 1, "1o turno"), runoff]));
+            [ElectionRound.Create(election.Id, 1), runoff]));
 
         lookup.TryGetRoundId(544, 1, out var firstRound).Should().BeTrue();
         firstRound.Should().NotBe(runoff.Id);
@@ -65,7 +65,7 @@ public sealed class TseElectionLookupTests
     public async Task ConcurrentReadersSeeConsistentResults()
     {
         var election = Election.Create(544, 2022, 1, "ORDINARIA", "2022", null);
-        var round = ElectionRound.Create(election.Id, 1, "1o turno");
+        var round = ElectionRound.Create(election.Id, 1);
 
         var lookup = await TseElectionLookup.LoadAsync(
             new FakeElectionRepository([election], [round]));

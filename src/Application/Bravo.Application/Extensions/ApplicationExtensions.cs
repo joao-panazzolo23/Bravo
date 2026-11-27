@@ -1,10 +1,10 @@
 using Bravo.Application.Behaviors;
 using Bravo.Application.Imports.Ibge;
+using Bravo.Application.Analytics;
 using Bravo.Shared.Notifications;
 using FluentValidation;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
-
 using Bravo.Application.Notifications;
 using Bravo.Application.Imports;
 using Bravo.Application.Tse;
@@ -26,6 +26,7 @@ public static class ApplicationExtensions
         return services.AddMediatorPattern()
                        .AddPipelineBehaviors()
                        .AddValidators()
+                       .AddElectionAnalytics()
                        .AddImportExecution()
                        .AddIbgeImport()
                        .AddTseImport();

@@ -50,15 +50,13 @@ internal sealed class ElectionRepository(NpgsqlDataSource dataSource) : IElectio
 
     private const string UpsertRoundSql = """
         INSERT INTO "ElectionRounds" AS target
-            ("Id", "ElectionId", "Round", "Name", "IsRunoff", "CreatedAt", "UpdatedAt")
+            ("Id", "ElectionId", "Round", "IsRunoff", "CreatedAt", "UpdatedAt")
         VALUES
-            (@Id, @ElectionId, @Round, @Name, @IsRunoff, @CreatedAt, @UpdatedAt)
+            (@Id, @ElectionId, @Round, @IsRunoff, @CreatedAt, @UpdatedAt)
         ON CONFLICT ("ElectionId", "Round") DO UPDATE SET
-            "Name" = EXCLUDED."Name",
             "IsRunoff" = EXCLUDED."IsRunoff",
             "UpdatedAt" = EXCLUDED."UpdatedAt"
-        WHERE ROW(target."Name", target."IsRunoff")
-              IS DISTINCT FROM ROW(EXCLUDED."Name", EXCLUDED."IsRunoff")
+        WHERE target."IsRunoff" IS DISTINCT FROM EXCLUDED."IsRunoff"
         RETURNING *;
         """;
 
@@ -116,7 +114,6 @@ internal sealed class ElectionRepository(NpgsqlDataSource dataSource) : IElectio
             round.Id,
             round.ElectionId,
             round.Round,
-            round.Name,
             round.IsRunoff,
             round.CreatedAt,
             round.UpdatedAt

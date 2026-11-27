@@ -10,7 +10,6 @@ internal sealed class ElectionRoundMap : EntityMapper<ElectionRound>
     {
         builder.ToTable("ElectionRounds");
 
-        builder.Property(x => x.Name).HasMaxLength(60).IsRequired();
         builder.Property(x => x.IsRunoff).IsRequired();
 
         builder.HasIndex(x => new { x.ElectionId, x.Round }).IsUnique();
